@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer">
   <title>Алмазная схема</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bea'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
   <aside class="panel">
@@ -169,16 +169,34 @@
       <div><b id="sumStones">0</b><small>страз</small></div>
       <div><b id="sumGrams">0</b><small>граммов</small></div>
     </div>
-    <p class="hint">Нажмите на цвет, чтобы подсветить его на схеме. Крестик убирает цвет — сервис подберёт замену.</p>
+    <p class="hint">Нажмите на цвет, чтобы подсветить его на схеме. Карандаш меняет номер на тот, что выберете вы. Крестик убирает цвет — замену подберёт сервис.</p>
     <div class="color-head" aria-hidden="true"><span></span><span>Номер</span><span>Штук</span><span>Вес</span></div>
     <ul id="colorList"></ul>
+    <div class="excluded" id="replacedBox" hidden></div>
     <div class="excluded" id="excludedBox" hidden></div>
   </aside>
 
-  <script src="js/palette-dmc.js?v=4"></script>
-  <script src="js/files.js?v=4"></script>
-  <script src="js/engine.js?v=4"></script>
-  <script src="js/render.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
+  <dialog class="pick" id="pickDialog" aria-labelledby="pickTitle">
+    <div class="pick-body">
+      <header>
+        <span class="swatch" id="pickSwatch" aria-hidden="true"></span>
+        <div>
+          <h2 id="pickTitle">Заменить цвет</h2>
+          <p id="pickSub"></p>
+        </div>
+        <button type="button" class="icon" id="pickClose" title="Закрыть" aria-label="Закрыть">×</button>
+      </header>
+      <input type="search" id="pickSearch" placeholder="Номер цвета, например 3865" autocomplete="off" aria-label="Найти номер цвета">
+      <p class="hint">Сверху — самые похожие оттенки. Обведённые номера уже есть в схеме: при выборе цвета сольются в один.</p>
+      <div class="pick-list" id="pickList"></div>
+      <p class="hint" id="pickNote"></p>
+    </div>
+  </dialog>
+
+  <script src="js/palette-dmc.js?v=5"></script>
+  <script src="js/files.js?v=5"></script>
+  <script src="js/engine.js?v=5"></script>
+  <script src="js/render.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
 </body>
 </html>

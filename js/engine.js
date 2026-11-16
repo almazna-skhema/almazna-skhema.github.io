@@ -382,28 +382,43 @@
     // г) чистим одиночные стразы
     if (opts.cleanup > 0) cleanup(idx, lab, sel, plab, cols, rows, opts.cleanup);
 
-    // д) итог: цвета по порядку номеров (как в легенде программы), символы, количества
+    // д) итог: цвета по порядку номеров (как в легенде программы), символы, количества.
+    // Ручные замены (opts.replace: номер, выбранный программой → цвет, назначенный вручную)
+    // применяются здесь: стразы меняют номер, а если такой номер уже есть в схеме — сливаются с ним.
+    const replace = opts.replace && opts.replace.size ? opts.replace : null;
     const selCount = new Uint32Array(sel.length);
     for (let i = 0; i < n; i++) selCount[idx[i]]++;
-    const order = [];
-    for (let k = 0; k < sel.length; k++) if (selCount[k] > 0) order.push(k);
-    order.sort(function (a, b) {
-      const ca = pal.items[sel[a]].code, cb = pal.items[sel[b]].code;
-      return ca < cb ? -1 : ca > cb ? 1 : 0;
+    const groups = new Map();
+    const groupOf = new Array(sel.length);
+    let picked = 0;
+    for (let k = 0; k < sel.length; k++) {
+      if (!selCount[k]) continue;
+      picked++;
+      const own = pal.items[sel[k]];
+      const it = (replace && replace.get(own.code)) || own;
+      let g = groups.get(it.code);
+      if (!g) { g = { item: it, count: 0, from: [], own: false }; groups.set(it.code, g); }
+      g.count += selCount[k];
+      if (it.code === own.code) g.own = true; else g.from.push(own.code);
+      groupOf[k] = g;
+    }
+    const list = Array.from(groups.values()).sort(function (a, b) {
+      return a.item.code < b.item.code ? -1 : a.item.code > b.item.code ? 1 : 0;
     });
-    const remap = new Int32Array(sel.length).fill(-1);
-    const colors = order.map(function (k, pos) {
-      remap[k] = pos;
-      const it = pal.items[sel[k]];
+    const colors = list.map(function (g, pos) {
+      g.pos = pos;
+      const it = g.item;
       return {
         code: it.code, hex: it.hex, r: it.r, g: it.g, b: it.b,
-        symbol: SYMBOLS[pos], count: selCount[k],
-        dark: 0.299 * it.r + 0.587 * it.g + 0.114 * it.b < 140
+        symbol: SYMBOLS[pos], count: g.count,
+        dark: 0.299 * it.r + 0.587 * it.g + 0.114 * it.b < 140,
+        from: g.from, // номера, которые программа выбрала сама, а пользователь заменил на этот
+        own: g.own    // программа выбрала этот номер и сама
       };
     });
     const cells = new Uint8Array(n);
-    for (let i = 0; i < n; i++) cells[i] = remap[idx[i]];
-    return { cols: cols, rows: rows, cells: cells, colors: colors };
+    for (let i = 0; i < n; i++) cells[i] = groupOf[idx[i]].pos;
+    return { cols: cols, rows: rows, cells: cells, colors: colors, picked: picked };
   }
 
   A.SYMBOLS = SYMBOLS;

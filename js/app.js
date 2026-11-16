@@ -2,7 +2,7 @@
 (function (A) {
   'use strict';
 
-  const VERSION = 'версия 4 · 16.11.2026';
+  const VERSION = 'версия 5 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -12,13 +12,14 @@
   const state = {
     img: null, imgUrl: '', thumb: null, logo: null, logoUrl: '',
     res: null, p: null, tab: 'mosaic', zoom: 1, cache: {},
-    focusX: 0.5, focusY: 0.5, highlightCode: null, excluded: new Set(), busy: false
+    focusX: 0.5, focusY: 0.5, highlightCode: null, excluded: new Set(), replaced: new Map(), busy: false
   };
   const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram'];
   const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057' };
   const FILE_NAMES = { mosaic: 'Вид мозаики.png', scheme: 'Схема для печати.png', legend: 'Легенда.png', layout: 'Макет.png' };
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
   const MAX_IMAGE_PIXELS = 150e6;
+  const PICK_LIMIT = 120; // сколько цветов показывать в окне замены
 
   // ---------- мелочи ----------
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
@@ -154,6 +155,33 @@
     return state.excluded.size ? A.paletteWithout(pal, state.excluded) : pal;
   }
 
+  let codeIndex = null, codeIndexFor = null;
+  function palByCode() {
+    if (codeIndexFor !== pal) {
+      codeIndex = new Map();
+      pal.items.forEach(function (it, i) { codeIndex.set(it.code, i); });
+      codeIndexFor = pal;
+    }
+    return codeIndex;
+  }
+
+  /* Ручные замены для расчёта: номер, выбранный программой → цвет из таблицы. */
+  function replaceMap() {
+    if (!state.replaced.size) return null;
+    const by = palByCode(), m = new Map();
+    state.replaced.forEach(function (to, from) {
+      const i = by.get(to);
+      if (i !== undefined) m.set(from, pal.items[i]);
+    });
+    return m;
+  }
+
+  function colorByCode(code) {
+    const cs = state.res ? state.res.colors : [];
+    for (let i = 0; i < cs.length; i++) if (cs[i].code === code) return cs[i];
+    return null;
+  }
+
   /* Убирает холсты предпросмотра из памяти (на планшетах она быстро кончается). */
   function dropCache(kinds) {
     (kinds || Object.keys(state.cache)).forEach(function (k) {
@@ -175,7 +203,7 @@
     let res;
     try {
       const grid = A.sampleGrid(state.img, p.cols, p.rows, p);
-      res = A.quantize(grid, activePalette(), p);
+      res = A.quantize(grid, activePalette(), Object.assign({}, p, { replace: replaceMap() }));
     } catch (e) {
       // старую схему не оставляем: иначе скачается результат от прежней картинки или настроек
       console.error(e);
@@ -197,7 +225,7 @@
     renderColorList();
     showTab();
     if (!state.busy) $('zip').disabled = false;
-    const got = res.colors.length, asked = Math.min(p.nColors, activePalette().items.length);
+    const got = res.picked, asked = Math.min(p.nColors, activePalette().items.length);
     setStatus('Готово за ' + ((performance.now() - t0) / 1000).toFixed(1).replace('.', ',') + ' с' +
       (got < asked ? ' · цветов вышло ' + got + ' из ' + asked + ': остальные на этой картинке не понадобились' : ''));
   }
@@ -383,6 +411,11 @@
       row.appendChild(el('span', '', fmt(c.count)));
       row.appendChild(el('span', 'muted', g + ' г'));
       row.addEventListener('click', function () { toggleHighlight(c.code); });
+      const ed = el('button', 'color-x color-edit' + (c.from.length ? ' changed' : ''), '✎');
+      ed.type = 'button';
+      ed.title = 'Заменить цвет ' + c.code + ' на другой номер' + (c.from.length ? ' (сейчас стоит вместо ' + c.from.join(', ') + ')' : '');
+      ed.setAttribute('aria-label', ed.title);
+      ed.addEventListener('click', function () { openPicker(c.code); });
       const x = el('button', 'color-x', '×');
       x.type = 'button';
       x.title = 'Убрать цвет ' + c.code + ' из схемы';
@@ -390,6 +423,7 @@
       x.disabled = !canExclude;
       x.addEventListener('click', function () { excludeColor(c.code); });
       li.appendChild(row);
+      li.appendChild(ed);
       li.appendChild(x);
       list.appendChild(li);
     });
@@ -410,6 +444,20 @@
         box.appendChild(chip);
       });
     }
+
+    const rbox = $('replacedBox');
+    rbox.textContent = '';
+    rbox.hidden = state.replaced.size === 0;
+    if (state.replaced.size) {
+      rbox.appendChild(el('span', '', 'Заменены:'));
+      state.replaced.forEach(function (to, from) {
+        const chip = el('button', 'chip', from + ' → ' + to + ' ↩');
+        chip.type = 'button';
+        chip.title = 'Отменить замену: вернуть цвет ' + from;
+        chip.addEventListener('click', function () { undoReplace(from); });
+        rbox.appendChild(chip);
+      });
+    }
   }
 
   function toggleHighlight(code) {
@@ -424,9 +472,103 @@
 
   function excludeColor(code) {
     if (pal.items.length - state.excluded.size <= 2) return; // в таблице должно остаться хотя бы два цвета
+    // если цвет стоит вместо других — убираем и их: от них уже отказались, когда заменяли
+    const c = colorByCode(code);
+    (c ? c.from : []).forEach(function (from) {
+      state.replaced.delete(from);
+      if (pal.items.length - state.excluded.size > 3) state.excluded.add(from);
+    });
     state.excluded.add(code);
     if (state.highlightCode === code) state.highlightCode = null;
     schedule(true);
+  }
+
+  // ---------- ручная замена цвета ----------
+  /* Все стразы, которые сейчас идут под номером code, получают номер to. */
+  function replaceColor(code, to) {
+    const c = colorByCode(code);
+    if (!c || code === to || !palByCode().has(to)) return;
+    const sources = c.from.slice();
+    if (c.own) sources.push(code);
+    sources.forEach(function (from) {
+      if (from === to) state.replaced.delete(from); else state.replaced.set(from, to);
+    });
+    if (state.highlightCode === code) state.highlightCode = to;
+    schedule(true);
+  }
+
+  function undoReplace(from) {
+    state.replaced.delete(from);
+    schedule(true);
+  }
+
+  let pickFor = null;
+
+  function closePicker() {
+    const d = $('pickDialog');
+    if (d.close) d.close(); else d.removeAttribute('open');
+    pickFor = null;
+  }
+
+  function fillPicker() {
+    const list = $('pickList');
+    list.textContent = '';
+    if (pickFor === null || !state.res) return;
+    const q = $('pickSearch').value.trim().toLowerCase();
+    const base = palByCode().get(pickFor), L = pal.lab;
+    const inScheme = new Set(state.res.colors.map(function (c) { return c.code; }));
+    const found = [];
+    pal.items.forEach(function (it, i) {
+      if (it.code === pickFor) return;
+      const low = it.code.toLowerCase();
+      if (q && low.indexOf(q) < 0) return;
+      let d = 0;
+      if (base !== undefined) {
+        const dl = L[i * 3] - L[base * 3], da = L[i * 3 + 1] - L[base * 3 + 1], db = L[i * 3 + 2] - L[base * 3 + 2];
+        d = dl * dl + da * da + db * db;
+      }
+      found.push({ it: it, d: d, head: q && low.indexOf(q) === 0 ? 0 : 1 });
+    });
+    // без поиска — самые похожие сверху; при поиске — сначала номера, начинающиеся с набранного
+    found.sort(function (a, b) { return (q ? a.head - b.head : 0) || a.d - b.d; });
+    found.slice(0, PICK_LIMIT).forEach(function (o) {
+      const it = o.it, same = inScheme.has(it.code);
+      const b = el('button', 'pick-item' + (same ? ' in-scheme' : ''));
+      b.type = 'button';
+      b.title = 'Заменить на ' + it.code + (same ? ' — этот номер уже есть в схеме, цвета сольются' : '');
+      const sw = el('span', 'swatch');
+      sw.style.backgroundColor = it.hex;
+      b.appendChild(sw);
+      b.appendChild(el('span', '', it.code));
+      b.addEventListener('click', function () {
+        const from = pickFor;
+        closePicker();
+        replaceColor(from, it.code);
+      });
+      list.appendChild(b);
+    });
+    $('pickNote').textContent = !found.length ? 'Такого номера в таблице нет.'
+      : found.length > PICK_LIMIT ? 'Показаны ' + PICK_LIMIT + ' из ' + found.length + '. Чтобы найти остальные, введите номер.'
+      : '';
+  }
+
+  function openPicker(code) {
+    const c = colorByCode(code);
+    if (!c) return;
+    pickFor = code;
+    $('pickTitle').textContent = 'Заменить цвет ' + code;
+    $('pickSub').textContent = fmt(c.count) + ' страз получат новый номер';
+    const sw = $('pickSwatch');
+    sw.textContent = c.symbol;
+    sw.style.backgroundColor = c.hex;
+    sw.style.color = c.dark ? '#ffffff' : '#000000';
+    $('pickSearch').value = '';
+    fillPicker();
+    const d = $('pickDialog');
+    if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+    $('pickList').scrollTop = 0;
+    // на сенсорных экранах поле не трогаем, чтобы клавиатура не закрывала список
+    if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) $('pickSearch').focus();
   }
 
   // ---------- выгрузка ----------
@@ -619,7 +761,8 @@
         if ((iw > ih * 1.05 && w < h) || (ih > iw * 1.05 && w > h)) { $('wCm').value = h; $('hCm').value = w; }
         state.focusX = state.focusY = 0.5;
         state.zoom = 1;
-        state.excluded.clear(); // убранные цвета относятся к прежней картинке
+        state.excluded.clear(); // убранные и заменённые цвета относятся к прежней картинке
+        state.replaced.clear();
         state.highlightCode = null;
         const thumb = $('dropThumb');
         thumb.textContent = '';
@@ -704,6 +847,7 @@
     palName = name;
     palNote = note || '';
     state.excluded.clear();
+    state.replaced.clear();
     state.highlightCode = null;
     showPalette();
     storePalette();
@@ -780,6 +924,7 @@
     if (state.img && state.img.naturalWidth > state.img.naturalHeight * 1.05) { $('wCm').value = DEFAULTS.hCm; $('hCm').value = DEFAULTS.wCm; }
     state.focusX = state.focusY = 0.5;
     state.excluded.clear();
+    state.replaced.clear();
     state.highlightCode = null;
     drawCrop();
     schedule(true);
@@ -894,6 +1039,16 @@
     window.addEventListener('resize', function () { applyZoom(); drawCrop(); });
 
     initCropDrag();
+    $('pickClose').addEventListener('click', closePicker);
+    $('pickSearch').addEventListener('input', fillPicker);
+    $('pickSearch').addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const first = $('pickList').querySelector('.pick-item');
+      if (first) first.click();
+    });
+    $('pickDialog').addEventListener('click', function (e) { if (e.target === e.currentTarget) closePicker(); }); // щелчок мимо окна
+    $('pickDialog').addEventListener('close', function () { pickFor = null; });
     $('zip').addEventListener('click', saveZip);
     $('saveOne').addEventListener('click', saveOne);
   }
@@ -902,7 +1057,8 @@
     state: state, buildFiles: buildFiles, params: params, flush: flush, selectTab: selectTab,
     loadUrl: function (url, name) { return loadImage(url, name, false); },
     loadPaletteText: loadPaletteText, resetPalette: resetPalette,
-    toggleHighlight: toggleHighlight, excludeColor: excludeColor
+    toggleHighlight: toggleHighlight, excludeColor: excludeColor,
+    replaceColor: replaceColor, undoReplace: undoReplace, openPicker: openPicker
   };
   init();
 })(window.ALMAZ = window.ALMAZ || {});
