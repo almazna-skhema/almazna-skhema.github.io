@@ -118,6 +118,44 @@
     return parts.concat(central, [end]); // массив кусков для new Blob(...)
   }
 
+  /* PDF из одной картинки JPEG на всю страницу. Размер страницы — в миллиметрах,
+   * так что типография получает лист точного размера. Возвращает части для Blob. */
+  function pdfFromJpeg(jpeg, wPx, hPx, wMm, hMm) {
+    const enc = new TextEncoder();
+    const pt = function (mm) { return ((mm * 72) / 25.4).toFixed(2); };
+    const W = pt(wMm), H = pt(hMm);
+    const content = 'q ' + W + ' 0 0 ' + H + ' 0 0 cm /Im0 Do Q';
+    const heads = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>',
+      '<< /Type /XObject /Subtype /Image /Width ' + wPx + ' /Height ' + hPx +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>',
+      '<< /Length ' + content.length + ' >>'
+    ];
+    const parts = [], offsets = [];
+    let pos = 0;
+    const put = function (chunk) {
+      const bytes = typeof chunk === 'string' ? enc.encode(chunk) : chunk;
+      parts.push(bytes);
+      pos += bytes.length;
+    };
+    put('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
+    heads.forEach(function (h, i) {
+      offsets.push(pos);
+      put((i + 1) + ' 0 obj\n' + h + '\n');
+      if (i === 3) { put('stream\n'); put(jpeg); put('\nendstream\n'); }
+      if (i === 4) put('stream\n' + content + '\nendstream\n');
+      put('endobj\n');
+    });
+    const xref = pos;
+    let table = 'xref\n0 6\n0000000000 65535 f \n';
+    offsets.forEach(function (o) { table += ('0000000000' + o).slice(-10) + ' 00000 n \n'; });
+    put(table + 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+    return parts;
+  }
+
+  A.pdfFromJpeg = pdfFromJpeg;
   A.crc32 = crc32;
   A.pngSetDpi = pngSetDpi;
   A.zipStore = zipStore;

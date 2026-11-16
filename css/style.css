@@ -87,6 +87,8 @@ body.with-colors {
 
 label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); position: relative; }
 label output { position: absolute; right: 0; top: 0; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--ink); cursor: pointer; }
+label.check input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--accent); }
 .hint { margin: -4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
 
 input[type="text"], input[type="number"], input[type="search"], select, textarea {
@@ -163,7 +165,8 @@ summary { cursor: pointer; font-size: 13px; }
 .status { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); min-height: 17px; text-align: center; }
 .status.error { color: var(--danger); font-weight: 600; }
 .status.ok { color: var(--ok); }
-.foot { margin: 6px 0 0; display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.foot { margin: 6px 0 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.foot button.link { font-size: 12.5px; }
 
 /* ---------- область просмотра ---------- */
 main { grid-area: main; min-width: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
@@ -182,7 +185,9 @@ main { grid-area: main; min-width: 0; height: 100vh; height: 100dvh; display: fl
 .stage.pannable { cursor: grab; }
 .stage.panning { cursor: grabbing; user-select: none; }
 .holder { min-width: 100%; min-height: 100%; display: grid; place-items: center; padding: 20px; width: max-content; }
+.holder > * { grid-area: 1 / 1; }
 .holder canvas { display: block; background: #fff; box-shadow: var(--shadow); }
+.holder canvas.ghost { opacity: 0.5; pointer-events: none; background: none; box-shadow: none; }
 
 .empty {
   position: absolute; inset: 24px; border: 2px dashed var(--line); border-radius: 16px;
@@ -206,9 +211,10 @@ main { grid-area: main; min-width: 0; height: 100vh; height: 100dvh; display: fl
 .summary b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
 .summary small { font-size: 11px; color: var(--muted); }
 
-.color-head, .color-row { display: grid; grid-template-columns: 28px 1fr 50px 36px; gap: 6px; align-items: center; }
-.color-head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 0 58px 0 6px; }
-.color-head span:nth-child(n + 3), .color-row span:nth-child(n + 3) { text-align: right; }
+.color-head { display: grid; grid-template-columns: 30px 1fr 50px 36px; gap: 6px; align-items: center; }
+.color-row { display: grid; grid-template-columns: 1fr 50px 36px; gap: 6px; align-items: center; }
+.color-head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 0 62px 0 0; }
+.color-head span:nth-child(n + 3), .color-row span:nth-child(n + 2) { text-align: right; }
 
 #colorList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 #colorList li { display: flex; align-items: center; gap: 2px; }
@@ -222,6 +228,9 @@ main { grid-area: main; min-width: 0; height: 100vh; height: 100dvh; display: fl
   width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center;
   font-weight: 700; font-size: 14px; border: 1px solid rgba(128, 128, 128, 0.45);
 }
+button.swatch-btn { padding: 0; flex: none; line-height: 1; }
+button.swatch-btn:hover:not(:disabled) { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.swatch-btn.custom { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
 .color-row .code { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .color-row .muted { color: var(--muted); }
 .color-x { width: 26px; height: 26px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 16px; flex: none; line-height: 1; }
@@ -231,6 +240,26 @@ main { grid-area: main; min-width: 0; height: 100vh; height: 100dvh; display: fl
 
 .excluded { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
 .chip { padding: 3px 8px; font-size: 12.5px; border-radius: 999px; background: var(--field); }
+
+/* ---------- кисть ---------- */
+button.toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.brushbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 16px;
+  background: var(--accent-soft); border-bottom: 1px solid var(--line);
+}
+.brushbar .hint { margin: 0; flex-basis: 100%; }
+.brushbar select { width: auto; padding: 7px 8px; }
+.brushbar .seg { background: var(--panel); }
+.brushbar .seg span { padding: 6px 10px; white-space: nowrap; }
+.brush-color { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 5px; }
+.brush-color span:last-child { color: var(--accent); font-size: 12.5px; }
+.stage.brush canvas { cursor: crosshair; touch-action: none; }
+.stage.brush { cursor: default; }
+
+.logo-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.logo-item { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 4px; display: flex; }
+.logo-item img { height: 46px; max-width: 110px; object-fit: contain; display: block; }
+.logo-item .color-x { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
 
 /* ---------- окно замены цвета ---------- */
 .pick {
@@ -257,6 +286,20 @@ main { grid-area: main; min-width: 0; height: 100vh; height: 100dvh; display: fl
 .pick-item .swatch { width: 24px; height: 24px; flex: none; }
 .pick-item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick-item.in-scheme { border-color: var(--accent); background: var(--accent-soft); }
+
+/* окно значка и цвета клетки */
+.pick-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px; }
+.pick h3 { margin: 4px 0 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+.sym-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 5px; }
+.sym-item { height: 38px; padding: 0; font-size: 19px; font-weight: 700; line-height: 1; }
+.sym-item.used { color: var(--muted); border-style: dashed; }
+.sym-item.current, .print-item.current { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+.print-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.print-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 13px; text-align: left; }
+.print-item .swatch { flex: none; }
+label.inline { flex-direction: row; align-items: center; gap: 10px; }
+input[type="color"] { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--field); }
+.pick .primary { width: auto; align-self: flex-end; padding: 9px 22px; font-size: 14px; }
 
 /* ---------- узкие экраны ---------- */
 @media (max-width: 1280px) {

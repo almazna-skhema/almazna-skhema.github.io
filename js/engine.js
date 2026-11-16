@@ -6,6 +6,10 @@
    * отодвинуты в конец, чтобы не путались при выкладке. */
   const SYMBOLS = '123456789ACEHJKLMNPRSTUWXYZ+=#%&@?*<>$FVbdfghkmnrt'.split('');
   const MAX_COLORS = SYMBOLS.length;
+  /* Крупные значки-фигуры: их можно назначить цвету вручную, когда буква или цифра
+   * плохо читается. На схеме рисуются контуром, а не шрифтом. */
+  const SHAPES = '●■▲▼◆★♥✚○□'.split('');
+  const ALL_SYMBOLS = SYMBOLS.concat(SHAPES);
   const MAX_PALETTE = 3000; // больше цветов в таблице не бывает, а расчёт начинает тормозить
 
   // ---------- цвет: sRGB -> Oklab (расстояния в нём близки к восприятию глазом) ----------
@@ -175,6 +179,7 @@
     const cf = (259 * (cv + 255)) / (255 * (259 - cv));
     const sf = 1 + (opts.saturation || 0) / 100;
     const rowLen = cols * S * 4;
+    const keepLines = !!opts.lines;
 
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
@@ -184,6 +189,31 @@
           for (let dx = 0; dx < S; dx++, p += 4) { r += px[p]; g += px[p + 1]; b += px[p + 2]; }
         }
         r /= S * S; g /= S * S; b /= S * S;
+        if (keepLines) {
+          // тонкая тёмная линия занимает лишь часть клетки и при усреднении растворяется в фоне.
+          // Если в клетке есть заметно более тёмные точки — берём цвет по ним: линия остаётся линией.
+          const mean = 0.299 * r + 0.587 * g + 0.114 * b;
+          let dn = 0, lmin = 255;
+          for (let dy = 0; dy < S; dy++) {
+            let p = (y * S + dy) * rowLen + x * S * 4;
+            for (let dx = 0; dx < S; dx++, p += 4) {
+              const l = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
+              if (l < mean - 50 && l < 130) { dn++; if (l < lmin) lmin = l; }
+            }
+          }
+          if (dn >= 3) {
+            // цвет линии — по самым тёмным точкам: края линии смешаны с фоном и дали бы грязный оттенок
+            let dr = 0, dg = 0, db = 0, m = 0;
+            for (let dy = 0; dy < S; dy++) {
+              let p = (y * S + dy) * rowLen + x * S * 4;
+              for (let dx = 0; dx < S; dx++, p += 4) {
+                const l = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
+                if (l <= lmin + 30) { dr += px[p]; dg += px[p + 1]; db += px[p + 2]; m++; }
+              }
+            }
+            r = dr / m; g = dg / m; b = db / m;
+          }
+        }
         r = cf * (r + br - 128) + 128; g = cf * (g + br - 128) + 128; b = cf * (b + br - 128) + 128;
         const gray = 0.299 * r + 0.587 * g + 0.114 * b;
         const o = (y * cols + x) * 3;
@@ -338,7 +368,7 @@
   }
 
   /* opts: nColors, dither (0..1), cleanup (0|1|2) */
-  function quantize(grid, pal, opts) {
+  function quantizeCore(grid, pal, opts) {
     const cols = grid.cols, rows = grid.rows, n = cols * rows, lab = grid.lab;
     const plab = pal.lab, P = pal.items.length;
     const nColors = Math.max(2, Math.min(MAX_COLORS, opts.nColors | 0));
@@ -382,46 +412,139 @@
     // г) чистим одиночные стразы
     if (opts.cleanup > 0) cleanup(idx, lab, sel, plab, cols, rows, opts.cleanup);
 
-    // д) итог: цвета по порядку номеров (как в легенде программы), символы, количества.
-    // Ручные замены (opts.replace: номер, выбранный программой → цвет, назначенный вручную)
-    // применяются здесь: стразы меняют номер, а если такой номер уже есть в схеме — сливаются с ним.
-    const replace = opts.replace && opts.replace.size ? opts.replace : null;
+    // д) убираем цвета, которых вышло слишком мало: их стразы уходят к ближайшему из оставшихся
+    const minCount = opts.minCount | 0;
     const selCount = new Uint32Array(sel.length);
     for (let i = 0; i < n; i++) selCount[idx[i]]++;
-    const groups = new Map();
-    const groupOf = new Array(sel.length);
-    let picked = 0;
-    for (let k = 0; k < sel.length; k++) {
-      if (!selCount[k]) continue;
-      picked++;
-      const own = pal.items[sel[k]];
-      const it = (replace && replace.get(own.code)) || own;
-      let g = groups.get(it.code);
-      if (!g) { g = { item: it, count: 0, from: [], own: false }; groups.set(it.code, g); }
-      g.count += selCount[k];
-      if (it.code === own.code) g.own = true; else g.from.push(own.code);
-      groupOf[k] = g;
+    if (minCount > 1) {
+      for (;;) {
+        let worst = -1, live = 0;
+        for (let k = 0; k < sel.length; k++) {
+          if (!selCount[k]) continue;
+          live++;
+          if (selCount[k] < minCount && (worst < 0 || selCount[k] < selCount[worst])) worst = k;
+        }
+        if (worst < 0 || live <= 2) break;
+        const others = [];
+        for (let k = 0; k < sel.length; k++) if (selCount[k] && k !== worst) others.push(k);
+        const list = others.map(function (k) { return sel[k]; });
+        for (let i = 0; i < n; i++) {
+          if (idx[i] !== worst) continue;
+          const k = others[nearest(lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2], plab, list)];
+          idx[i] = k;
+          selCount[k]++;
+        }
+        selCount[worst] = 0;
+      }
     }
-    const list = Array.from(groups.values()).sort(function (a, b) {
+
+    let picked = 0;
+    for (let k = 0; k < sel.length; k++) if (selCount[k]) picked++;
+    return { cols: cols, rows: rows, idx: idx, sel: sel, pal: pal, picked: picked };
+  }
+
+  /* Итог: цвета по порядку номеров (как в легенде программы), значки, количества.
+   * Поверх автоматического подбора накладываются ручные правки (over):
+   *   replace — Map: номер, выбранный программой → цвет, назначенный вручную;
+   *             если такой номер уже есть в схеме, стразы сливаются с ним;
+   *   paint   — Map: номер клетки → номер цвета (прорисовка кистью), itemOf(номер) → цвет;
+   *   symbols — Map: номер цвета → значок;
+   *   print   — Map: номер цвета → {r, g, b, hex} — каким цветом печатать клетку на схеме. */
+  function compose(core, over) {
+    over = over || {};
+    const pal = core.pal, sel = core.sel, idx = core.idx, n = idx.length;
+    const replace = over.replace && over.replace.size ? over.replace : null;
+    const paint = over.paint && over.paint.size && over.itemOf ? over.paint : null;
+    const groups = [], byCode = new Map(), painted = new Map();
+    function gid(it) {
+      let g = byCode.get(it.code);
+      if (g === undefined) {
+        g = groups.length;
+        byCode.set(it.code, g);
+        groups.push({ item: it, count: 0, from: [], own: false, painted: 0 });
+      }
+      return g;
+    }
+    const selG = new Int32Array(sel.length).fill(-1);
+    const cellG = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      let g = -1;
+      if (paint) {
+        const code = paint.get(i);
+        if (code !== undefined) {
+          g = painted.get(code);
+          if (g === undefined) {
+            const it = over.itemOf(code);
+            g = it ? gid(it) : -1; // номера нет в таблице — клетка остаётся как подобрала программа
+            painted.set(code, g);
+          }
+          if (g >= 0) groups[g].painted++;
+        }
+      }
+      if (g < 0) {
+        const k = idx[i];
+        g = selG[k];
+        if (g < 0) {
+          const own = pal.items[sel[k]];
+          const it = (replace && replace.get(own.code)) || own;
+          g = gid(it);
+          if (it.code === own.code) groups[g].own = true; else groups[g].from.push(own.code);
+          selG[k] = g;
+        }
+      }
+      groups[g].count++;
+      cellG[i] = g;
+    }
+    const list = groups.filter(function (g) { return g.count > 0; }).sort(function (a, b) {
       return a.item.code < b.item.code ? -1 : a.item.code > b.item.code ? 1 : 0;
+    });
+    // значки: сначала назначенные вручную, остальным — первые свободные по порядку
+    const used = new Set();
+    list.forEach(function (g) {
+      const s = over.symbols && over.symbols.get(g.item.code);
+      if (s && !used.has(s)) { g.symbol = s; used.add(s); }
+    });
+    let next = 0;
+    list.forEach(function (g) {
+      if (g.symbol) return;
+      while (next < ALL_SYMBOLS.length && used.has(ALL_SYMBOLS[next])) next++;
+      g.symbol = ALL_SYMBOLS[next] || '?';
+      used.add(g.symbol);
     });
     const colors = list.map(function (g, pos) {
       g.pos = pos;
       const it = g.item;
+      let pr = over.print && over.print.get(it.code);
+      // совсем тёмная клетка печатается светлее: значок читается, краски уходит меньше
+      if (!pr && over.autoLight && 0.299 * it.r + 0.587 * it.g + 0.114 * it.b < 85) pr = lighter(it, 0.62);
       return {
         code: it.code, hex: it.hex, r: it.r, g: it.g, b: it.b,
-        symbol: SYMBOLS[pos], count: g.count,
-        dark: 0.299 * it.r + 0.587 * it.g + 0.114 * it.b < 140,
-        from: g.from, // номера, которые программа выбрала сама, а пользователь заменил на этот
-        own: g.own    // программа выбрала этот номер и сама
+        symbol: g.symbol, count: g.count, dark: isDark(it),
+        from: g.from,       // номера, которые программа выбрала сама, а пользователь заменил на этот
+        own: g.own,         // программа выбрала этот номер и сама
+        painted: g.painted, // сколько страз этого цвета поставлено кистью
+        print: pr ? { r: pr.r, g: pr.g, b: pr.b, hex: pr.hex, dark: isDark(pr) } : null
       };
     });
     const cells = new Uint8Array(n);
-    for (let i = 0; i < n; i++) cells[i] = groupOf[idx[i]].pos;
-    return { cols: cols, rows: rows, cells: cells, colors: colors, picked: picked };
+    for (let i = 0; i < n; i++) cells[i] = groups[cellG[i]].pos;
+    return { cols: core.cols, rows: core.rows, cells: cells, colors: colors, picked: core.picked };
+  }
+
+  function isDark(c) { return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b < 140; }
+
+  function lighter(c, t) {
+    const r = Math.round(c.r + (255 - c.r) * t), g = Math.round(c.g + (255 - c.g) * t), b = Math.round(c.b + (255 - c.b) * t);
+    return { r: r, g: g, b: b, hex: '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1) };
+  }
+
+  function quantize(grid, pal, opts) {
+    return compose(quantizeCore(grid, pal, opts), opts);
   }
 
   A.SYMBOLS = SYMBOLS;
+  A.SHAPES = SHAPES;
+  A.ALL_SYMBOLS = ALL_SYMBOLS;
   A.MAX_COLORS = MAX_COLORS;
   A.MAX_PALETTE = MAX_PALETTE;
   A.parsePalette = parsePalette;
@@ -432,5 +555,7 @@
   A.downscale = downscale;
   A.sampleGrid = sampleGrid;
   A.quantize = quantize;
+  A.quantizeCore = quantizeCore;
+  A.compose = compose;
   A.makeCanvas = makeCanvas;
 })(typeof window !== 'undefined' ? (window.ALMAZ = window.ALMAZ || {}) : module.exports);

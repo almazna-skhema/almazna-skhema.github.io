@@ -78,14 +78,70 @@
   }
 
   // ---------- схема для печати ----------
+  /* Значки-фигуры рисуем сами, а не шрифтом: так они одинаковые на любом компьютере
+   * и заметно крупнее букв. r — половина размера значка. */
+  function drawShape(x, sym, cx, cy, r) {
+    x.beginPath();
+    if (sym === '●') x.arc(cx, cy, r * 0.95, 0, Math.PI * 2);
+    else if (sym === '■') x.rect(cx - r * 0.82, cy - r * 0.82, r * 1.64, r * 1.64);
+    else if (sym === '▲' || sym === '▼') {
+      const d = sym === '▲' ? 1 : -1;
+      x.moveTo(cx, cy - r * 0.95 * d);
+      x.lineTo(cx + r, cy + r * 0.8 * d);
+      x.lineTo(cx - r, cy + r * 0.8 * d);
+      x.closePath();
+    } else if (sym === '◆') {
+      x.moveTo(cx, cy - r * 1.08);
+      x.lineTo(cx + r * 0.9, cy);
+      x.lineTo(cx, cy + r * 1.08);
+      x.lineTo(cx - r * 0.9, cy);
+      x.closePath();
+    } else if (sym === '★') {
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5, q = i % 2 ? r * 0.46 : r * 1.1;
+        x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * q, cy + r * 0.06 + Math.sin(a) * q);
+      }
+      x.closePath();
+    } else if (sym === '♥') {
+      const t = cy - r * 0.38, w = r * 1.02;
+      x.moveTo(cx, cy + r * 0.95);
+      x.bezierCurveTo(cx - w * 1.5, cy - r * 0.05, cx - w * 0.75, t - r * 0.95, cx, t);
+      x.bezierCurveTo(cx + w * 0.75, t - r * 0.95, cx + w * 1.5, cy - r * 0.05, cx, cy + r * 0.95);
+      x.closePath();
+    } else if (sym === '✚') {
+      const a = r * 0.34;
+      x.rect(cx - a, cy - r, a * 2, r * 2);
+      x.rect(cx - r, cy - a, r * 2, a * 2);
+    } else if (sym === '○' || sym === '□') {
+      x.lineWidth = r * 0.36;
+      x.strokeStyle = x.fillStyle;
+      if (sym === '○') x.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+      else x.rect(cx - r * 0.68, cy - r * 0.68, r * 1.36, r * 1.36);
+      x.stroke();
+      return true;
+    } else return false;
+    x.fill();
+    return true;
+  }
+
   function drawSymbol(x, c, cx, cy, size) {
+    x.fillStyle = c.faint ? '#c4c4c4' : c.dark ? '#ffffff' : '#000000';
+    if (c.symbol.length === 1 && A.SHAPES && A.SHAPES.indexOf(c.symbol) >= 0 && drawShape(x, c.symbol, cx, cy, size * 0.47)) return;
     x.font = 'bold ' + Math.round(size) + 'px ' + FONT;
     x.textAlign = 'center';
     x.textBaseline = 'alphabetic';
     const m = x.measureText(c.symbol);
     const dy = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-    x.fillStyle = c.faint ? '#c4c4c4' : c.dark ? '#ffffff' : '#000000';
     x.fillText(c.symbol, cx, cy + dy);
+  }
+
+  /* Цвета так, как они напечатаны на схеме: клетке можно задать свой цвет печати
+   * (например, чёрные стразы печатать светло-серым, чтобы значок читался). */
+  function printed(colors) {
+    return colors.map(function (c) {
+      if (!c.print) return c;
+      return { code: c.code, symbol: c.symbol, count: c.count, r: c.print.r, g: c.print.g, b: c.print.b, hex: c.print.hex, dark: c.print.dark };
+    });
   }
 
   function symbolSprite(c, s, shape) {
@@ -101,13 +157,13 @@
       x.fillStyle = c.hex;
       x.fillRect(0, 0, s, s);
     }
-    if (s >= 9) drawSymbol(x, c, s / 2, s / 2, s * 0.66);
+    if (s >= 9) drawSymbol(x, c, s / 2, s / 2, s * 0.78);
     return cv;
   }
 
   function renderScheme(res, cellPx, shape, highlight) {
     const s = cellPx;
-    const cv = drawCells(res, s, withHighlight(res.colors, highlight).map(function (c) { return symbolSprite(c, s, shape); }));
+    const cv = drawCells(res, s, withHighlight(printed(res.colors), highlight).map(function (c) { return symbolSprite(c, s, shape); }));
     const x = cv.getContext('2d'), W = cv.width, H = cv.height;
     if (s >= 6) {
       const big = s >= 16; // на мелком предпросмотре линии делаем легче, иначе они забивают картинку
@@ -149,7 +205,7 @@
 
   function renderLegend(res, meta) {
     const K = 2; // масштаб для чёткости
-    const colors = res.colors, n = colors.length;
+    const colors = printed(res.colors), n = colors.length;
     const W = 1100, pad = 48, rowH = 40, headH = 34, gap = 56;
     const cc = n > 26 ? 2 : 1;
     const perCol = Math.ceil(n / cc);
@@ -200,7 +256,7 @@
         x.strokeStyle = '#333333';
         x.lineWidth = 1;
         x.strokeRect(x0 + 4.5, y + 5.5, 29, 29);
-        drawSymbol(x, c, x0 + 19, y + 20, 20);
+        drawSymbol(x, c, x0 + 19, y + 20, 22);
         const g = grams(c.count, meta.gramPerStone);
         total += c.count; totalG += g;
         x.fillStyle = '#111111';
@@ -257,7 +313,7 @@
     x.closePath();
   }
 
-  /* meta: wCm, hCm, pitch, shape, article, title, urls[], logo (Image|null), focusX, focusY
+  /* meta: wCm, hCm, pitch, shape, article, title, urls[], logos (картинки для низа листа), focusX, focusY
    * src — исходная картинка (или null), scheme — готовый холст схемы с тем же cellPx */
   function renderLayout(res, meta, src, cellPx, scheme) {
     const pxmm = cellPx / meta.pitch;
@@ -365,7 +421,7 @@
     x.font = boldFont(rowH * 0.56);
     x.fillText('DMC', lx + rowH * 0.35, ly + rowH * 0.75);
     const sq = rowH * 0.62;
-    res.colors.forEach(function (c, i) {
+    printed(res.colors).forEach(function (c, i) {
       const y = ly + rowH * (1.35 + i);
       const qx = lx + rowH * 0.35, qy = y + (rowH - sq) / 2;
       x.fillStyle = c.hex;
@@ -373,7 +429,7 @@
       x.strokeStyle = '#444444';
       x.lineWidth = Math.max(0.5, rowH * 0.02);
       x.strokeRect(qx, qy, sq, sq);
-      if (sq >= 7) drawSymbol(x, c, qx + sq / 2, qy + sq / 2, sq * 0.74);
+      if (sq >= 7) drawSymbol(x, c, qx + sq / 2, qy + sq / 2, sq * 0.78);
       x.fillStyle = '#000000';
       x.textAlign = 'left';
       x.textBaseline = 'middle';
@@ -381,11 +437,24 @@
       x.fillText(c.code, qx + sq + rowH * 0.3, y + rowH / 2, codeMax);
     });
 
-    // логотип / QR внизу по центру
-    if (meta.logo) {
-      const lw = meta.logo.naturalWidth || meta.logo.width, lh = meta.logo.naturalHeight || meta.logo.height;
-      const s = Math.min(mm(26) / lh, mm(240) / lw);
-      x.drawImage(meta.logo, (W - lw * s) / 2, H - mm(4) - lh * s, lw * s, lh * s);
+    // QR-коды и логотип внизу по центру: в ряд, одной высоты, в порядке добавления
+    const logos = (meta.logos || []).filter(function (im) { return (im.naturalWidth || im.width) > 0 && (im.naturalHeight || im.height) > 0; });
+    if (logos.length) {
+      const lgap = mm(8);
+      let h = mm(26), rowW = lgap * (logos.length - 1);
+      const widths = logos.map(function (im) { return (im.naturalWidth || im.width) / (im.naturalHeight || im.height); });
+      widths.forEach(function (a) { rowW += a * h; });
+      const maxW = Math.min(mm(240), W - mm(20));
+      const k2 = Math.min(1, maxW / rowW); // длинный ряд ужимаем целиком
+      h *= k2;
+      let px = (W - rowW * k2) / 2;
+      x.imageSmoothingEnabled = true;
+      x.imageSmoothingQuality = 'high';
+      logos.forEach(function (im, i) {
+        const w = widths[i] * h;
+        x.drawImage(im, px, H - mm(4) - h, w, h);
+        px += w + lgap * k2;
+      });
     }
     return cv;
   }
@@ -402,6 +471,8 @@
   A.renderLegend = renderLegend;
   A.legendCsv = legendCsv;
   A.renderLayout = renderLayout;
+  A.drawSymbol = drawSymbol;
+  A.printed = printed;
   A.layoutCells = layoutCells;
   A.grams = grams;
 })(window.ALMAZ = window.ALMAZ || {});
