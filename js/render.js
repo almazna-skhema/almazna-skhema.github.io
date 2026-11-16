@@ -2,6 +2,8 @@
 (function (A) {
   'use strict';
 
+  const T = A.T; // перевод надписи на выбранный язык
+
   const FONT = 'Arial, Helvetica, sans-serif';
   const MARGIN_MM = 50; // поля макета вокруг схемы (как в образце: 40x50 на листе 50x60)
 
@@ -195,12 +197,12 @@
   }
 
   function sizeLabel(meta) {
-    return meta.wCm + '×' + meta.hCm + ' см';
+    return meta.wCm + '×' + meta.hCm + T(' см');
   }
 
   function stoneLabel(meta) {
     const p = String(meta.pitch).replace('.', ',');
-    return meta.shape === 'round' ? 'круглых страз ' + p + ' мм' : 'страз размера ' + p + ' × ' + p + ' мм';
+    return meta.shape === 'round' ? T('круглых страз ') + p + T(' мм') : T('страз размера ') + p + ' × ' + p + T(' мм');
   }
 
   function renderLegend(res, meta) {
@@ -224,7 +226,7 @@
     x.textAlign = 'left';
     x.textBaseline = 'alphabetic';
     x.font = 'bold 22px ' + FONT;
-    x.fillText('Легенда для схемы размером ' + sizeLabel(meta) + '* (' + res.cols + '×' + res.rows + ' страз) из ' + n + ' цветов', pad, pad + 22, W - pad * 2);
+    x.fillText(T('Легенда для схемы размером ') + sizeLabel(meta) + '* (' + res.cols + '×' + res.rows + T(' страз) из ') + n + T(' цветов'), pad, pad + 22, W - pad * 2);
     if (hasSub) {
       x.font = '16px ' + FONT;
       x.fillStyle = '#555555';
@@ -238,11 +240,11 @@
       x.font = 'bold 12px ' + FONT;
       x.fillStyle = '#666666';
       x.textAlign = 'left';
-      x.fillText('ЗНАЧОК', x0, top + 20);
-      x.fillText('НОМЕР DMC', xCode, top + 20);
+      x.fillText(T('ЗНАЧОК'), x0, top + 20);
+      x.fillText(T('НОМЕР DMC'), xCode, top + 20);
       x.textAlign = 'right';
-      x.fillText('ЧИСЛО СТРАЗ', xCount, top + 20);
-      x.fillText('ВЕС, г*', xW, top + 20);
+      x.fillText(T('ЧИСЛО СТРАЗ'), xCount, top + 20);
+      x.fillText(T('ВЕС, г*'), xW, top + 20);
       x.fillStyle = '#111111';
       x.fillRect(x0, top + headH - 2, colW, 2);
 
@@ -266,7 +268,7 @@
         x.font = '17px ' + FONT;
         x.textAlign = 'right';
         x.fillText(fmt(c.count), xCount, y + 26);
-        x.fillText(g + ' г', xW, y + 26);
+        x.fillText(g + T(' г'), xW, y + 26);
       }
     }
 
@@ -275,12 +277,12 @@
     x.fillRect(pad, y - 22, W - pad * 2, 1);
     x.textAlign = 'left';
     x.font = 'bold 17px ' + FONT;
-    x.fillText('Всего: ' + fmt(total) + ' страз, около ' + fmt(totalG) + ' г', pad, y + 6);
+    x.fillText(T('Всего: ') + fmt(total) + T(' страз, около ') + fmt(totalG) + T(' г'), pad, y + 6);
     y += 48;
     x.font = '13px ' + FONT;
     x.fillStyle = '#555555';
-    x.fillText('* Размер схемы в см и вес страз каждого цвета указаны ориентировочно для ' + stoneLabel(meta) + '.', pad, y);
-    x.fillText('Вес округлён вверх до целого грамма, из расчёта ' + String(meta.gramPerStone).replace('.', ',') + ' г на одну стразу.', pad, y + 20);
+    x.fillText(T('* Размер схемы в см и вес страз каждого цвета указаны ориентировочно для ') + stoneLabel(meta) + '.', pad, y);
+    x.fillText(T('Вес округлён вверх до целого грамма, из расчёта ') + String(meta.gramPerStone).replace('.', ',') + T(' г на одну стразу.'), pad, y + 20);
     return cv;
   }
 
@@ -293,7 +295,7 @@
   }
 
   function legendCsv(res, meta) {
-    const rows = ['Значок;Номер DMC;Число страз;Вес, г'];
+    const rows = [T('Значок;Номер DMC;Число страз;Вес, г')];
     res.colors.forEach(function (c) {
       rows.push([c.symbol, c.code, c.count, grams(c.count, meta.gramPerStone)].map(csvCell).join(';'));
     });
@@ -360,7 +362,7 @@
     };
     const left = [];
     if (meta.article) left.push(meta.article);
-    left.push(meta.wCm + 'x' + meta.hCm + 'см');
+    left.push(meta.wCm + 'x' + meta.hCm + T('см'));
     blocks.push(textBlock(left, fs));
     if (meta.title) blocks.push(textBlock(['«' + meta.title + '»'], fs));
     const thumbH = mm(20);

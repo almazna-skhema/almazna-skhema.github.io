@@ -2,7 +2,9 @@
 (function (A) {
   'use strict';
 
-  const VERSION = 'версия 7 · 16.11.2026';
+  const T = A.T; // перевод надписи на выбранный язык
+
+  const VERSION = T('версия') + ' 8 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -23,7 +25,7 @@
   // что входит в проект (настройки одной картинки)
   const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight'];
   const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057', minCount: 0, lines: '0', autoLight: '0' };
-  const FILE_NAMES = { mosaic: 'Вид мозаики.png', scheme: 'Схема для печати.png', legend: 'Легенда.png', layout: 'Макет.png' };
+  const FILE_NAMES = { mosaic: T('Вид мозаики.png'), scheme: T('Схема для печати.png'), legend: T('Легенда.png'), layout: T('Макет.png') };
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
   const MAX_IMAGE_PIXELS = 150e6;
   const PICK_LIMIT = 120; // сколько цветов показывать в окне замены
@@ -145,8 +147,8 @@
 
   function updateStats() {
     const p = state.p || params();
-    let text = p.cols + ' × ' + p.rows + ' страз · ' + fmt(p.cols * p.rows) + ' шт';
-    if (state.res) text += ' · печать ' + dpiOf(exportCell(p, state.res), p) + ' dpi';
+    let text = p.cols + ' × ' + p.rows + T(' страз · ') + fmt(p.cols * p.rows) + T(' шт');
+    if (state.res) text += T(' · печать ') + dpiOf(exportCell(p, state.res), p) + ' dpi';
     $('stats').textContent = text;
   }
 
@@ -160,7 +162,7 @@
     touch();
     pendingFull = pendingFull || full; // пересчёт не должен теряться, если следом поменяли текстовое поле
     clearTimeout(timer);
-    if (pendingFull) setStatus('Считаю…');
+    if (pendingFull) setStatus(T('Считаю…'));
     timer = setTimeout(flush, pendingFull ? 140 : 250);
   }
 
@@ -193,8 +195,8 @@
 
   function showStockNote() {
     const info = stockInfo(), n = info.found.size;
-    $('stockNote').textContent = (n ? 'Не предлагаю цветов: ' + n + '. ' : 'Эти цвета сервис не будет предлагать ни в одной схеме. ') +
-      (info.unknown.length ? 'Нет в таблице: ' + info.unknown.slice(0, 8).join(', ') + (info.unknown.length > 8 ? '…' : '') + '.' : '');
+    $('stockNote').textContent = (n ? T('Не предлагаю цветов: ') + n + '. ' : T('Эти цвета сервис не будет предлагать ни в одной схеме. ')) +
+      (info.unknown.length ? T('Нет в таблице: ') + info.unknown.slice(0, 8).join(', ') + (info.unknown.length > 8 ? '…' : '') + '.' : '');
   }
 
   function activePalette() {
@@ -290,7 +292,7 @@
       $('holder').hidden = true;
       $('empty').hidden = false;
       $('zip').disabled = $('saveOne').disabled = true;
-      setStatus('Не удалось обработать картинку. Попробуйте сохранить её как JPG или PNG и загрузить снова.', 'error');
+      setStatus(T('Не удалось обработать картинку. Попробуйте сохранить её как JPG или PNG и загрузить снова.'), 'error');
       return;
     }
     state.p = p;
@@ -301,9 +303,9 @@
     afterResult();
     const got = res.picked, asked = Math.min(p.nColors, activePalette().items.length);
     const pt = state.paint;
-    setStatus('Готово за ' + ((performance.now() - t0) / 1000).toFixed(1).replace('.', ',') + ' с' +
-      (got < asked ? ' · цветов вышло ' + got + ' из ' + asked + ': остальные на этой картинке не понадобились' : '') +
-      (pt.cells.size && !paintFits() ? ' · прорисовка кистью сделана для холста ' + pt.cols + ' × ' + pt.rows + ' страз и на этом размере не показана' : ''));
+    setStatus(T('Готово за ') + ((performance.now() - t0) / 1000).toFixed(1).replace('.', ',') + T(' с') +
+      (got < asked ? T(' · цветов вышло ') + got + T(' из ') + asked + T(': остальные на этой картинке не понадобились') : '') +
+      (pt.cells.size && !paintFits() ? T(' · прорисовка кистью сделана для холста ') + pt.cols + ' × ' + pt.rows + T(' страз и на этом размере не показана') : ''));
   }
 
   function afterResult() {
@@ -517,25 +519,25 @@
       sw.type = 'button';
       sw.style.backgroundColor = look.hex;
       sw.style.color = look.dark ? '#ffffff' : '#000000';
-      sw.title = 'Значок и цвет клетки для ' + c.code + ' на схеме';
+      sw.title = T('Значок и цвет клетки для ') + c.code + T(' на схеме');
       sw.setAttribute('aria-label', sw.title);
       sw.addEventListener('click', function () { openSymbols(c.code); });
       const row = el('button', 'color-row');
       row.type = 'button';
       row.setAttribute('aria-pressed', (brushOn ? c.code === state.brush.code : i === hi) ? 'true' : 'false');
-      row.title = brushOn ? 'Взять цвет ' + c.code + ' на кисть' : 'Подсветить цвет ' + c.code + ' на схеме';
+      row.title = brushOn ? T('Взять цвет ') + c.code + T(' на кисть') : T('Подсветить цвет ') + c.code + T(' на схеме');
       row.appendChild(el('span', 'code', c.code));
       row.appendChild(el('span', '', fmt(c.count)));
-      row.appendChild(el('span', 'muted', g + ' г'));
+      row.appendChild(el('span', 'muted', g + T(' г')));
       row.addEventListener('click', function () { if (state.brush.on) setBrushCode(c.code); else toggleHighlight(c.code); });
       const ed = el('button', 'color-x color-edit' + (c.from.length ? ' changed' : ''), '✎');
       ed.type = 'button';
-      ed.title = 'Заменить цвет ' + c.code + ' на другой номер' + (c.from.length ? ' (сейчас стоит вместо ' + c.from.join(', ') + ')' : '');
+      ed.title = T('Заменить цвет ') + c.code + T(' на другой номер') + (c.from.length ? T(' (сейчас стоит вместо ') + c.from.join(', ') + ')' : '');
       ed.setAttribute('aria-label', ed.title);
       ed.addEventListener('click', function () { openPicker(c.code); });
       const x = el('button', 'color-x', '×');
       x.type = 'button';
-      x.title = 'Убрать цвет ' + c.code + ' из схемы';
+      x.title = T('Убрать цвет ') + c.code + T(' из схемы');
       x.setAttribute('aria-label', x.title);
       x.disabled = !canExclude;
       x.addEventListener('click', function () { excludeColor(c.code); });
@@ -553,11 +555,11 @@
     box.textContent = '';
     box.hidden = state.excluded.size === 0;
     if (state.excluded.size) {
-      box.appendChild(el('span', '', 'Убраны:'));
+      box.appendChild(el('span', '', T('Убраны:')));
       state.excluded.forEach(function (code) {
         const chip = el('button', 'chip', code + ' ↩');
         chip.type = 'button';
-        chip.title = 'Вернуть цвет ' + code;
+        chip.title = T('Вернуть цвет ') + code;
         chip.addEventListener('click', function () { state.excluded.delete(code); schedule(true); });
         box.appendChild(chip);
       });
@@ -567,11 +569,11 @@
     rbox.textContent = '';
     rbox.hidden = state.replaced.size === 0;
     if (state.replaced.size) {
-      rbox.appendChild(el('span', '', 'Заменены:'));
+      rbox.appendChild(el('span', '', T('Заменены:')));
       state.replaced.forEach(function (to, from) {
         const chip = el('button', 'chip', from + ' → ' + to + ' ↩');
         chip.type = 'button';
-        chip.title = 'Отменить замену: вернуть цвет ' + from;
+        chip.title = T('Отменить замену: вернуть цвет ') + from;
         chip.addEventListener('click', function () { undoReplace(from); });
         rbox.appendChild(chip);
       });
@@ -666,8 +668,8 @@
       const it = o.it, same = inScheme.has(it.code);
       const b = el('button', 'pick-item' + (same ? ' in-scheme' : ''));
       b.type = 'button';
-      b.title = brush ? 'Взять на кисть ' + it.code + (same ? '' : ' — цвет добавится в схему, когда вы им нарисуете')
-        : 'Заменить на ' + it.code + (same ? ' — этот номер уже есть в схеме, цвета сольются' : '');
+      b.title = brush ? T('Взять на кисть ') + it.code + (same ? '' : T(' — цвет добавится в схему, когда вы им нарисуете'))
+        : T('Заменить на ') + it.code + (same ? T(' — этот номер уже есть в схеме, цвета сольются') : '');
       const sw = el('span', 'swatch');
       sw.style.backgroundColor = it.hex;
       b.appendChild(sw);
@@ -679,8 +681,8 @@
       });
       list.appendChild(b);
     });
-    $('pickNote').textContent = !found.length ? 'Такого номера в таблице нет.'
-      : found.length > PICK_LIMIT ? 'Показаны ' + PICK_LIMIT + ' из ' + found.length + '. Чтобы найти остальные, введите номер.'
+    $('pickNote').textContent = !found.length ? T('Такого номера в таблице нет.')
+      : found.length > PICK_LIMIT ? T('Показаны ') + PICK_LIMIT + T(' из ') + found.length + T('. Чтобы найти остальные, введите номер.')
       : '';
   }
 
@@ -699,9 +701,9 @@
     if (!c) return;
     pickFor = code;
     pickMode = 'replace';
-    $('pickTitle').textContent = 'Заменить цвет ' + code;
-    $('pickSub').textContent = fmt(c.count) + ' страз получат новый номер';
-    $('pickHint').textContent = 'Сверху — самые похожие оттенки. Обведённые номера уже есть в схеме: при выборе цвета сольются в один.';
+    $('pickTitle').textContent = T('Заменить цвет ') + code;
+    $('pickSub').textContent = fmt(c.count) + T(' страз получат новый номер');
+    $('pickHint').textContent = T('Сверху — самые похожие оттенки. Обведённые номера уже есть в схеме: при выборе цвета сольются в один.');
     const sw = $('pickSwatch');
     sw.textContent = c.symbol;
     sw.style.backgroundColor = c.hex;
@@ -714,9 +716,9 @@
     if (!it || !state.res) return;
     pickFor = it.code;
     pickMode = 'brush';
-    $('pickTitle').textContent = 'Цвет кисти';
-    $('pickSub').textContent = 'Сейчас ' + it.code + '. Можно взять любой номер из таблицы';
-    $('pickHint').textContent = 'Обведённые номера уже есть в схеме, они стоят первыми. Остальные добавятся в схему, когда вы ими нарисуете.';
+    $('pickTitle').textContent = T('Цвет кисти');
+    $('pickSub').textContent = T('Сейчас ') + it.code + T('. Можно взять любой номер из таблицы');
+    $('pickHint').textContent = T('Обведённые номера уже есть в схеме, они стоят первыми. Остальные добавятся в схему, когда вы ими нарисуете.');
     const sw = $('pickSwatch');
     sw.textContent = '';
     sw.style.backgroundColor = it.hex;
@@ -910,7 +912,7 @@
     if (state.undo.length > UNDO_LIMIT) state.undo.shift();
     cells.clear();
     applyOverlays();
-    setStatus('Прорисовка стёрта. Кнопка «Отменить» вернёт её.');
+    setStatus(T('Прорисовка стёрта. Кнопка «Отменить» вернёт её.'));
   }
 
   function paintDown(e) {
@@ -923,7 +925,7 @@
       return true;
     }
     if (b.tool !== 'erase' && !colorByCode(b.code) && res.colors.length >= A.ALL_SYMBOLS.length) {
-      setStatus('В схеме уже ' + res.colors.length + ' цветов — для нового не осталось значка. Возьмите на кисть цвет из списка.', 'error');
+      setStatus(T('В схеме уже ') + res.colors.length + T(' цветов — для нового не осталось значка. Возьмите на кисть цвет из списка.'), 'error');
       return true;
     }
     ensurePaintGrid();
@@ -1007,7 +1009,7 @@
     const c = symFor === null ? null : colorByCode(symFor);
     if (!c) { if (symFor !== null) closeSymbols(); return; }
     const look = c.print || c;
-    $('symTitle').textContent = 'Цвет ' + c.code + ' на схеме';
+    $('symTitle').textContent = T('Цвет ') + c.code + T(' на схеме');
     const head = $('symSwatch');
     head.textContent = c.symbol;
     head.style.backgroundColor = look.hex;
@@ -1021,8 +1023,8 @@
       const taken = owner.get(sym);
       const b = el('button', 'sym-item' + (sym === c.symbol ? ' current' : '') + (taken ? ' used' : ''), sym);
       b.type = 'button';
-      b.title = sym === c.symbol ? 'Этот значок стоит сейчас'
-        : taken ? 'Сейчас у цвета ' + taken + ' — он получит другой значок' : 'Поставить этот значок';
+      b.title = sym === c.symbol ? T('Этот значок стоит сейчас')
+        : taken ? T('Сейчас у цвета ') + taken + T(' — он получит другой значок') : T('Поставить этот значок');
       b.addEventListener('click', function () { setSymbol(c.code, sym); });
       list.appendChild(b);
     });
@@ -1031,8 +1033,8 @@
     const plist = $('printList');
     plist.textContent = '';
     const current = state.print.get(c.code) || null;
-    [['Как у стразы', null], ['Светлее', lighten(c, 0.45)], ['Ещё светлее', lighten(c, 0.72)],
-      ['Светло-серый', '#d9d9d9'], ['Серый', '#a6a6a6'], ['Белый', '#ffffff']].forEach(function (o) {
+    [[T('Как у стразы'), null], [T('Светлее'), lighten(c, 0.45)], [T('Ещё светлее'), lighten(c, 0.72)],
+      [T('Светло-серый'), '#d9d9d9'], [T('Серый'), '#a6a6a6'], [T('Белый'), '#ffffff']].forEach(function (o) {
       const hex = o[1], shown = hex || c.hex;
       const b = el('button', 'print-item' + (hex === current ? ' current' : ''));
       b.type = 'button';
@@ -1146,14 +1148,14 @@
       for (const kind of kinds) {
         await wait(20); // даём браузеру обновить надпись о ходе работы
         if (kind === 'csv') {
-          out.push({ name: 'Расход страз.csv', data: new TextEncoder().encode(A.legendCsv(res, p)) });
+          out.push({ name: T('Расход страз.csv'), data: new TextEncoder().encode(A.legendCsv(res, p)) });
         } else if (kind === 'scheme') {
           out.push({ name: FILE_NAMES.scheme, data: await canvasPng(scheme, pxmm) });
-          if (pdf) out.push({ name: 'Схема для печати.pdf', data: await canvasPdf(scheme, pxmm) });
+          if (pdf) out.push({ name: T('Схема для печати.pdf'), data: await canvasPdf(scheme, pxmm) });
         } else if (kind === 'layout') {
           cv = A.renderLayout(res, p, img, cell, scheme);
           out.push({ name: FILE_NAMES.layout, data: await canvasPng(cv, pxmm) });
-          if (pdf) out.push({ name: 'Макет.pdf', data: await canvasPdf(cv, pxmm) });
+          if (pdf) out.push({ name: T('Макет.pdf'), data: await canvasPdf(cv, pxmm) });
         } else if (kind === 'mosaic') {
           const mc = Math.min(cell, 16);
           cv = A.renderMosaic(res, mc, p.shape);
@@ -1177,7 +1179,7 @@
     const p = state.p;
     const s = [p.article, p.title].filter(Boolean).join(' ')
       .replace(/[\u0000-\u001f\\/:*?"<>|]+/g, ' ').replace(/^[\s.]+/, '').trim().slice(0, 80).trim();
-    return s || 'Схема ' + p.wCm + 'x' + p.hCm;
+    return s || T('Схема ') + p.wCm + 'x' + p.hCm;
   }
 
   function download(parts, name, type) {
@@ -1199,17 +1201,17 @@
     const old = button.textContent;
     $('zip').disabled = $('saveOne').disabled = true;
     button.textContent = label;
-    setStatus('Готовлю файлы в печатном качестве, это займёт несколько секунд…');
+    setStatus(T('Готовлю файлы в печатном качестве, это займёт несколько секунд…'));
     await wait(40);
     try {
       const wanted = dpiOf(exportCell(state.p, state.res), state.p);
       const dpi = await job();
       setStatus(dpi && dpi < wanted
-        ? 'Сохранено, но с разрешением ' + dpi + ' dpi: это устройство не справляется с большим. Для печати лучше скачать с компьютера.'
-        : 'Сохранено в папку загрузок', 'ok');
+        ? T('Сохранено, но с разрешением ') + dpi + T(' dpi: это устройство не справляется с большим. Для печати лучше скачать с компьютера.')
+        : T('Сохранено в папку загрузок'), 'ok');
     } catch (e) {
       console.error(e);
-      setStatus('Не получилось сохранить: браузеру не хватило памяти. Уменьшите размер холста или скачайте с компьютера.', 'error');
+      setStatus(T('Не получилось сохранить: браузеру не хватило памяти. Уменьшите размер холста или скачайте с компьютера.'), 'error');
     }
     button.textContent = old;
     state.busy = false;
@@ -1218,7 +1220,7 @@
   }
 
   function saveZip() {
-    return runExport($('zip'), 'Собираю комплект…', async function () {
+    return runExport($('zip'), T('Собираю комплект…'), async function () {
       const name = baseName();
       const files = await buildFiles(exportKinds());
       download(A.zipStore(files), name + '.zip', 'application/zip');
@@ -1228,7 +1230,7 @@
 
   function saveOne() {
     if (state.tab === 'original') return Promise.resolve();
-    return runExport($('saveOne'), 'Готовлю файл…', async function () {
+    return runExport($('saveOne'), T('Готовлю файл…'), async function () {
       const name = baseName();
       const files = await buildFiles([state.tab]);
       download([files[0].data], name + ' — ' + files[0].name, 'image/png');
@@ -1251,7 +1253,7 @@
         const iw = img.naturalWidth, ih = img.naturalHeight;
         if (!iw || !ih || iw * ih > MAX_IMAGE_PIXELS) {
           if (isBlob) URL.revokeObjectURL(src);
-          setStatus(iw && ih ? 'Картинка слишком большая. Уменьшите её до 10 000 точек по длинной стороне.' : 'В файле нет изображения.', 'error');
+          setStatus(iw && ih ? T('Картинка слишком большая. Уменьшите её до 10 000 точек по длинной стороне.') : T('В файле нет изображения.'), 'error');
           reject(new Error('bad image size'));
           return;
         }
@@ -1263,7 +1265,7 @@
         } catch (e) {
           console.error(e);
           if (isBlob) URL.revokeObjectURL(src);
-          setStatus('Не удалось прочитать эту картинку. Сохраните её как JPG или PNG и загрузите снова.', 'error');
+          setStatus(T('Не удалось прочитать эту картинку. Сохраните её как JPG или PNG и загрузите снова.'), 'error');
           reject(e);
           return;
         }
@@ -1292,8 +1294,8 @@
         const thumb = $('dropThumb');
         thumb.textContent = '';
         thumb.style.backgroundImage = 'url("' + thumbUrl + '")';
-        $('dropTitle').textContent = name || 'Картинка загружена';
-        $('dropHint').textContent = fmt(iw) + ' × ' + fmt(ih) + ' точек · нажмите, чтобы заменить';
+        $('dropTitle').textContent = name || T('Картинка загружена');
+        $('dropHint').textContent = fmt(iw) + ' × ' + fmt(ih) + T(' точек · нажмите, чтобы заменить');
         syncOutputs();
         saveSettings();
         clearTimeout(timer);
@@ -1304,7 +1306,7 @@
       };
       img.onerror = function () {
         if (isBlob) URL.revokeObjectURL(src);
-        setStatus('Не удалось открыть файл. Подойдут JPG, PNG, WebP. Фото с iPhone в формате HEIC сначала сохраните как JPG.', 'error');
+        setStatus(T('Не удалось открыть файл. Подойдут JPG, PNG, WebP. Фото с iPhone в формате HEIC сначала сохраните как JPG.'), 'error');
         reject(new Error('image load failed'));
       };
       img.src = src;
@@ -1316,8 +1318,8 @@
     if (state.busy) return;
     if (/\.(csv|txt)$/i.test(file.name)) { loadPaletteFile(file); return; } // таблицу цветов тоже можно перетащить
     if (/\.(almaz|json)$/i.test(file.name)) { openProjectFile(file); return; }
-    if (!isImageFile(file)) { setStatus('Это не картинка. Подойдут JPG, PNG, WebP.', 'error'); return; }
-    setStatus('Открываю картинку…');
+    if (!isImageFile(file)) { setStatus(T('Это не картинка. Подойдут JPG, PNG, WebP.'), 'error'); return; }
+    setStatus(T('Открываю картинку…'));
     loadImage(URL.createObjectURL(file), file.name, true, { blob: file }).catch(function () {});
   }
 
@@ -1341,14 +1343,14 @@
     try {
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-        setStatus('Картинка ' + (i + 1) + ' из ' + files.length + ': ' + f.name + ' — готовлю комплект…');
+        setStatus(T('Картинка ') + (i + 1) + T(' из ') + files.length + ': ' + f.name + T(' — готовлю комплект…'));
         await wait(40);
         try {
           await loadImage(URL.createObjectURL(f), f.name, true, { blob: f });
           if (!state.res) throw new Error('нет результата');
-          setStatus('Картинка ' + (i + 1) + ' из ' + files.length + ': ' + f.name + ' — готовлю комплект…');
+          setStatus(T('Картинка ') + (i + 1) + T(' из ') + files.length + ': ' + f.name + T(' — готовлю комплект…'));
           const built = await buildFiles(kinds);
-          const base = f.name.replace(/\.[^.]+$/, '').replace(/[\u0000-\u001f\\/:*?"<>|]+/g, ' ').replace(/^[\s.]+/, '').trim().slice(0, 60) || 'Картинка';
+          const base = f.name.replace(/\.[^.]+$/, '').replace(/[\u0000-\u001f\\/:*?"<>|]+/g, ' ').replace(/^[\s.]+/, '').trim().slice(0, 60) || T('Картинка');
           let folder = base, k = 2;
           while (used.has(folder.toLowerCase())) folder = base + ' (' + (k++) + ')';
           used.add(folder.toLowerCase());
@@ -1359,13 +1361,13 @@
         }
       }
       const done = files.length - failed.length;
-      if (done) download(A.zipStore(out), 'Макеты — ' + done + ' шт.zip', 'application/zip');
-      setStatus((done ? 'Готово: комплектов ' + done + ', архив в папке загрузок. ' : '') +
-        (failed.length ? 'Не получилось: ' + failed.join(', ') + '. ' : '') +
-        (extra ? 'За один раз обрабатываю до ' + MAX_BATCH + ' картинок — остальные загрузите следующей пачкой.' : ''), failed.length || !done ? 'error' : 'ok');
+      if (done) download(A.zipStore(out), T('Макеты — ') + done + T(' шт.zip'), 'application/zip');
+      setStatus((done ? T('Готово: комплектов ') + done + T(', архив в папке загрузок. ') : '') +
+        (failed.length ? T('Не получилось: ') + failed.join(', ') + '. ' : '') +
+        (extra ? T('За один раз обрабатываю до ') + MAX_BATCH + T(' картинок — остальные загрузите следующей пачкой.') : ''), failed.length || !done ? 'error' : 'ok');
     } catch (e) {
       console.error(e);
-      setStatus('Не получилось собрать архив: браузеру не хватило памяти. Загрузите меньше картинок за раз.', 'error');
+      setStatus(T('Не получилось собрать архив: браузеру не хватило памяти. Загрузите меньше картинок за раз.'), 'error');
     }
     state.busy = batchRunning = false;
     touch(); // последняя картинка пачки остаётся открытой — её и запоминаем
@@ -1441,7 +1443,7 @@
     if (o.shape === 'round' || o.shape === 'square') document.querySelector('input[name=shape][value=' + o.shape + ']').checked = true;
     if (o.palette && typeof o.palette.text === 'string' && o.palette.text.length < 400000) {
       const parsed = A.parsePaletteText(o.palette.text);
-      if (parsed.items.length >= 2) { pal = A.paletteFromItems(parsed.items); palName = String(o.palette.name || 'Своя таблица').slice(0, 60); palNote = ''; }
+      if (parsed.items.length >= 2) { pal = A.paletteFromItems(parsed.items); palName = String(o.palette.name || T('Своя таблица')).slice(0, 60); palNote = ''; }
     } else if (o.palette === null) { pal = defaultPal; palName = ''; palNote = ''; }
     showPalette();
     storePalette();
@@ -1500,7 +1502,7 @@
       jobs.push(imageBlob().then(function (blob) { return dbPut('image', { blob: blob, name: name, id: id }); }));
     }
     jobs.push(dbPut('state', projectData()));
-    Promise.all(jobs).catch(function () { /* хранилище недоступно — остаётся файл проекта */ });
+    return Promise.all(jobs).catch(function () { /* хранилище недоступно — остаётся файл проекта */ });
   }
 
   function restoreWork() {
@@ -1510,7 +1512,7 @@
       const same = !!st && typeof st === 'object' && st.imageId === im.id;
       if (same) applyProjectData(st);
       return loadImage(URL.createObjectURL(im.blob), im.name, true, { keep: same, blob: im.blob, id: im.id, stored: true }).then(function () {
-        setStatus('Открыта прошлая работа' + (im.name ? ' — ' + im.name : '') + '. Чтобы начать новую, загрузите другую картинку.');
+        setStatus(T('Открыта прошлая работа') + (im.name ? ' — ' + im.name : '') + T('. Чтобы начать новую, загрузите другую картинку.'));
       });
     }).catch(function () { /* нет сохранённой работы или хранилище недоступно */ });
   }
@@ -1527,23 +1529,23 @@
   function saveProject() {
     if (!state.img || state.busy) return;
     flush();
-    setStatus('Сохраняю проект…');
+    setStatus(T('Сохраняю проект…'));
     imageBlob().then(blobToDataUrl).then(function (dataUrl) {
       const o = projectData();
       o.image = dataUrl;
       o.logos = state.logos.map(function (l) { return { name: l.name, data: l.data }; });
       download([JSON.stringify(o)], baseName() + '.almaz', 'application/json');
-      setStatus('Проект сохранён в папку загрузок. Откройте его кнопкой «Открыть проект» — и продолжите с того же места.', 'ok');
+      setStatus(T('Проект сохранён в папку загрузок. Откройте его кнопкой «Открыть проект» — и продолжите с того же места.'), 'ok');
     }).catch(function (e) {
       console.error(e);
-      setStatus('Не удалось сохранить проект.', 'error');
+      setStatus(T('Не удалось сохранить проект.'), 'error');
     });
   }
 
   function openProjectFile(file) {
     if (!file || state.busy) return;
-    if (file.size > 120e6) { setStatus('Файл проекта слишком большой.', 'error'); return; }
-    setStatus('Открываю проект…');
+    if (file.size > 120e6) { setStatus(T('Файл проекта слишком большой.'), 'error'); return; }
+    setStatus(T('Открываю проект…'));
     file.text().then(function (text) {
       const o = JSON.parse(text);
       if (!o || o.app !== 'almaz-schema' || typeof o.image !== 'string' || !/^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/i.test(o.image)) throw new Error('не проект');
@@ -1559,11 +1561,11 @@
       return ready.then(function () {
         return loadImage(o.image, String(o.name || file.name), false, { keep: true });
       }).then(function () {
-        setStatus('Проект открыт' + (o.name ? ' — ' + String(o.name).slice(0, 80) : '') + '.', 'ok');
+        setStatus(T('Проект открыт') + (o.name ? ' — ' + String(o.name).slice(0, 80) : '') + '.', 'ok');
       });
     }).catch(function (e) {
       console.error(e);
-      setStatus('Не удалось открыть проект: файл повреждён или это не проект «Алмазной схемы».', 'error');
+      setStatus(T('Не удалось открыть проект: файл повреждён или это не проект «Алмазной схемы».'), 'error');
     });
   }
 
@@ -1580,7 +1582,7 @@
       im.title = l.name;
       const x = el('button', 'color-x', '×');
       x.type = 'button';
-      x.title = 'Убрать картинку «' + l.name + '»';
+      x.title = T('Убрать картинку «') + l.name + '»';
       x.setAttribute('aria-label', x.title);
       x.addEventListener('click', function () {
         state.logos.splice(i, 1);
@@ -1592,9 +1594,9 @@
       item.appendChild(x);
       list.appendChild(item);
     });
-    $('logoHint').textContent = n ? 'Стоят внизу макета в ряд, в этом порядке. Сохранены для следующих макетов.'
-      : 'До четырёх картинок — встанут в ряд внизу макета. Запоминаются для следующих макетов.';
-    $('logoPick').textContent = n ? 'Добавить ещё' : 'Добавить картинки';
+    $('logoHint').textContent = n ? T('Стоят внизу макета в ряд, в этом порядке. Сохранены для следующих макетов.')
+      : T('До четырёх картинок — встанут в ряд внизу макета. Запоминаются для следующих макетов.');
+    $('logoPick').textContent = n ? T('Добавить ещё') : T('Добавить картинки');
     $('logoPick').disabled = n >= MAX_LOGOS;
   }
 
@@ -1602,7 +1604,7 @@
     try {
       localStorage.setItem('almaz-logos', JSON.stringify(state.logos.map(function (l) { return { name: l.name, data: l.data }; })));
     } catch (e) {
-      setStatus('Картинки стоят на макете, но запомнить их для следующего раза не удалось: в браузере мало места.');
+      setStatus(T('Картинки стоят на макете, но запомнить их для следующего раза не удалось: в браузере мало места.'));
     }
   }
 
@@ -1620,7 +1622,7 @@
             x.imageSmoothingEnabled = k < 1; // мелкие QR-коды не размываем
             x.imageSmoothingQuality = 'high';
             x.drawImage(img, 0, 0, cv.width, cv.height);
-            item = { img: cv, name: String(file.name || 'картинка').slice(0, 60), data: cv.toDataURL('image/png') };
+            item = { img: cv, name: String(file.name || T('картинка')).slice(0, 60), data: cv.toDataURL('image/png') };
           }
         } catch (e) { console.error(e); }
         URL.revokeObjectURL(url);
@@ -1634,7 +1636,7 @@
   function addLogoFiles(fileList) {
     const files = Array.prototype.slice.call(fileList || []).filter(isImageFile);
     const room = MAX_LOGOS - state.logos.length;
-    if (!files.length) { setStatus('Нужны картинки: PNG или JPG.', 'error'); return Promise.resolve(); }
+    if (!files.length) { setStatus(T('Нужны картинки: PNG или JPG.'), 'error'); return Promise.resolve(); }
     return Promise.all(files.slice(0, room).map(readLogo)).then(function (items) {
       const ok = items.filter(Boolean);
       ok.forEach(function (it) { state.logos.push(it); });
@@ -1643,7 +1645,7 @@
       schedule(false);
       const lost = items.length - ok.length, extra = files.length - items.length;
       if (lost || extra) {
-        setStatus((lost ? 'Не удалось открыть картинок: ' + lost + '. ' : '') + (extra ? 'Помещается не больше ' + MAX_LOGOS + ' картинок.' : ''), 'error');
+        setStatus((lost ? T('Не удалось открыть картинок: ') + lost + '. ' : '') + (extra ? T('Помещается не больше ') + MAX_LOGOS + T(' картинок.') : ''), 'error');
       }
     });
   }
@@ -1651,7 +1653,7 @@
   function loadLogoData(o) {
     return new Promise(function (resolve) {
       const img = new Image();
-      img.onload = function () { resolve({ img: img, name: String(o.name || 'картинка').slice(0, 60), data: o.data }); };
+      img.onload = function () { resolve({ img: img, name: String(o.name || T('картинка')).slice(0, 60), data: o.data }); };
       img.onerror = function () { resolve(null); };
       img.src = o.data;
     });
@@ -1675,10 +1677,10 @@
   function showPalette() {
     const custom = pal !== defaultPal;
     const n = pal.items.length;
-    $('palName').textContent = custom ? palName : 'Открытая таблица DMC';
+    $('palName').textContent = custom ? palName : T('Открытая таблица DMC');
     $('palHint').textContent = custom
-      ? 'Ваша таблица, цветов: ' + n + palNote
-      : n + ' цвета ниток — оттенки страз могут отличаться';
+      ? T('Ваша таблица, цветов: ') + n + palNote
+      : n + T(' цвета ниток — оттенки страз могут отличаться');
     $('palReset').hidden = !custom;
     const range = $('nColors');
     range.min = Math.min(5, n);
@@ -1714,14 +1716,14 @@
   function loadPaletteText(text, name) {
     const parsed = A.parsePaletteText(text);
     if (parsed.items.length < 2) {
-      setStatus('В файле не нашлось цветов. Нужна таблица: в каждой строке номер и цвет (#rrggbb или R;G;B).', 'error');
+      setStatus(T('В файле не нашлось цветов. Нужна таблица: в каждой строке номер и цвет (#rrggbb или R;G;B).'), 'error');
       return false;
     }
-    const note = (parsed.skipped ? ' · не прочитано строк: ' + parsed.skipped : '') +
-      (parsed.tooMany ? ' · взяты первые ' + A.MAX_PALETTE : '');
-    setPalette(A.paletteFromItems(parsed.items), String(name || 'Своя таблица').slice(0, 60), note);
+    const note = (parsed.skipped ? T(' · не прочитано строк: ') + parsed.skipped : '') +
+      (parsed.tooMany ? T(' · взяты первые ') + A.MAX_PALETTE : '');
+    setPalette(A.paletteFromItems(parsed.items), String(name || T('Своя таблица')).slice(0, 60), note);
     schedule(true);
-    if (!state.img) setStatus('Таблица загружена, цветов: ' + parsed.items.length, 'ok');
+    if (!state.img) setStatus(T('Таблица загружена, цветов: ') + parsed.items.length, 'ok');
     return true;
   }
 
@@ -1739,19 +1741,19 @@
   function loadPaletteFile(file) {
     if (!file) return;
     if (/\.(xlsx?|ods|numbers)$/i.test(file.name)) {
-      setStatus('Файлы Excel напрямую не читаются. Сохраните таблицу как CSV и загрузите её.', 'error');
+      setStatus(T('Файлы Excel напрямую не читаются. Сохраните таблицу как CSV и загрузите её.'), 'error');
       return;
     }
-    if (file.size > 2e6) { setStatus('Файл таблицы слишком большой — в нём должны быть только номера и цвета.', 'error'); return; }
+    if (file.size > 2e6) { setStatus(T('Файл таблицы слишком большой — в нём должны быть только номера и цвета.'), 'error'); return; }
     file.arrayBuffer().then(function (buf) { loadPaletteText(decodeText(new Uint8Array(buf)), file.name); }, function () {
-      setStatus('Не удалось прочитать файл таблицы', 'error');
+      setStatus(T('Не удалось прочитать файл таблицы'), 'error');
     });
   }
 
   function resetPalette() {
     setPalette(defaultPal, '');
     schedule(true);
-    if (!state.img) setStatus('Возвращена открытая таблица DMC');
+    if (!state.img) setStatus(T('Возвращена открытая таблица DMC'));
   }
 
   function restorePalette() {
@@ -1761,7 +1763,7 @@
         const parsed = A.parsePaletteText(o.text);
         if (parsed.items.length >= 2) {
           pal = A.paletteFromItems(parsed.items);
-          palName = String(o.name || 'Своя таблица').slice(0, 60);
+          palName = String(o.name || T('Своя таблица')).slice(0, 60);
           palNote = '';
         }
       }
@@ -1770,8 +1772,8 @@
   }
 
   function savePaletteSample() {
-    download(['\ufeff' + paletteText()], 'Таблица цветов — образец.csv', 'text/csv');
-    setStatus('Образец сохранён: замените в нём цвета на цвета своих страз и загрузите обратно', 'ok');
+    download(['\ufeff' + paletteText()], T('Таблица цветов — образец.csv'), 'text/csv');
+    setStatus(T('Образец сохранён: замените в нём цвета на цвета своих страз и загрузите обратно'), 'ok');
   }
 
   function resetAll() {
@@ -1788,11 +1790,22 @@
     state.highlightCode = null;
     drawCrop();
     schedule(true);
-    if (!state.img) setStatus('Настройки сброшены');
+    if (!state.img) setStatus(T('Настройки сброшены'));
   }
 
   // ---------- события ----------
   function init() {
+    A.translateDom(document.body);
+    document.querySelectorAll('[data-lang]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.lang === A.lang ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        if (b.dataset.lang === A.lang) return;
+        A.setLang(b.dataset.lang);
+        // страница перезагружается на новом языке; работа перед этим сохраняется и откроется снова
+        clearTimeout(saveTimer);
+        Promise.resolve(autosave()).then(function () { location.reload(); }, function () { location.reload(); });
+      });
+    });
     $('version').textContent = VERSION;
     loadSettings();
     restorePalette();
