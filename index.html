@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Алмазная схема</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <aside class="panel">
+    <header class="brand">
+      <h1>Алмазная схема</h1>
+      <p>Картинка → схема алмазной мозаики по палитре DMC</p>
+    </header>
+
+    <section>
+      <h2><span>1</span>Картинка</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" hidden>
+        <span class="drop-thumb" id="dropThumb"></span>
+        <span class="drop-text">
+          <b id="dropTitle">Выбрать картинку</b>
+          <small id="dropHint">или перетащите файл сюда</small>
+        </span>
+      </label>
+      <div class="field" id="cropFields" hidden>
+        <label>Сдвиг кадра по горизонтали <input type="range" id="focusX" min="0" max="100" value="50" data-kind="full"></label>
+        <label>Сдвиг кадра по вертикали <input type="range" id="focusY" min="0" max="100" value="50" data-kind="full"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2><span>2</span>Холст</h2>
+      <div class="row">
+        <label class="grow">Размер
+          <select id="sizePreset">
+            <option value="20x20">20 × 20 см</option>
+            <option value="20x30">20 × 30 см</option>
+            <option value="30x30">30 × 30 см</option>
+            <option value="30x40">30 × 40 см</option>
+            <option value="40x50" selected>40 × 50 см</option>
+            <option value="40x60">40 × 60 см</option>
+            <option value="50x70">50 × 70 см</option>
+            <option value="60x80">60 × 80 см</option>
+            <option value="custom">Свой размер</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Ширина, см <input type="number" id="wCm" min="5" max="120" step="1" value="40" data-kind="full"></label>
+        <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст">⇄</button>
+        <label>Высота, см <input type="number" id="hCm" min="5" max="120" step="1" value="50" data-kind="full"></label>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="Тип страз">
+        <label><input type="radio" name="shape" value="square" checked data-kind="full"><span>Квадратные 2,5 мм</span></label>
+        <label><input type="radio" name="shape" value="round" data-kind="full"><span>Круглые 2,8 мм</span></label>
+      </div>
+      <p class="stats" id="stats">160 × 200 страз</p>
+    </section>
+
+    <section>
+      <h2><span>3</span>Цвета</h2>
+      <div class="palette">
+        <div class="palette-info">
+          <b id="palName">Открытая таблица DMC</b>
+          <small id="palHint">454 цвета ниток — оттенки страз могут отличаться</small>
+        </div>
+        <div class="palette-actions">
+          <label class="filebtn">Загрузить свою таблицу
+            <input type="file" id="palFile" accept=".csv,.txt,text/csv,text/plain" hidden>
+          </label>
+          <button type="button" class="link" id="palSample">Скачать образец</button>
+          <button type="button" class="link" id="palReset" hidden>Вернуть стандартную</button>
+        </div>
+      </div>
+      <label>Число цветов <output id="nColorsOut">26</output>
+        <input type="range" id="nColors" min="5" max="50" value="26" data-kind="full">
+      </label>
+      <label>Одиночные стразы
+        <select id="cleanup" data-kind="full">
+          <option value="0">Оставить как есть</option>
+          <option value="1" selected>Убрать мелкий шум</option>
+          <option value="2">Убрать сильнее</option>
+        </select>
+      </label>
+      <label>Сглаживание <output id="smoothOut">20</output>
+        <input type="range" id="smooth" min="0" max="100" value="20" data-kind="full">
+      </label>
+      <label>Плавные переходы (точечное смешение) <output id="ditherOut">0</output>
+        <input type="range" id="dither" min="0" max="100" value="0" step="5" data-kind="full">
+      </label>
+      <details>
+        <summary>Коррекция картинки</summary>
+        <label>Яркость <output id="brightnessOut">0</output>
+          <input type="range" id="brightness" min="-50" max="50" value="0" data-kind="full"></label>
+        <label>Контраст <output id="contrastOut">0</output>
+          <input type="range" id="contrast" min="-50" max="50" value="0" data-kind="full"></label>
+        <label>Насыщенность <output id="saturationOut">0</output>
+          <input type="range" id="saturation" min="-100" max="100" value="0" data-kind="full"></label>
+        <button type="button" class="link" id="resetAdjust">Сбросить коррекцию</button>
+      </details>
+    </section>
+
+    <section>
+      <h2><span>4</span>Макет</h2>
+      <div class="row">
+        <label class="grow">Артикул <input type="text" id="article" placeholder="AS 45462" data-kind="meta"></label>
+      </div>
+      <label>Название <input type="text" id="title" placeholder="Зимові будиночки" data-kind="meta"></label>
+      <label>Адреса сайта (по одному в строке)
+        <textarea id="urls" rows="2" placeholder="www.example.com" data-kind="meta"></textarea>
+      </label>
+      <label>Логотип и QR-коды (одна картинка, PNG)
+        <input type="file" id="logoFile" accept="image/*">
+      </label>
+      <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" data-kind="meta"></label>
+    </section>
+
+    <footer class="actions">
+      <button type="button" class="primary" id="zip" disabled>Скачать комплект (ZIP)</button>
+      <p class="status" id="status" role="status">Загрузите картинку, чтобы начать</p>
+    </footer>
+  </aside>
+
+  <main>
+    <nav class="tabs">
+      <div class="tablist" role="tablist">
+        <button role="tab" data-tab="mosaic" aria-selected="true">Мозаика</button>
+        <button role="tab" data-tab="scheme" aria-selected="false">Схема</button>
+        <button role="tab" data-tab="legend" aria-selected="false">Легенда</button>
+        <button role="tab" data-tab="layout" aria-selected="false">Макет</button>
+      </div>
+      <div class="tools">
+        <button type="button" class="icon" id="zoomOut" title="Уменьшить" aria-label="Уменьшить">−</button>
+        <button type="button" class="ghost" id="zoomFit">Вписать</button>
+        <button type="button" class="icon" id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
+        <button type="button" class="ghost" id="saveOne" disabled>Скачать этот файл</button>
+      </div>
+    </nav>
+    <div class="stage" id="stage">
+      <div class="empty" id="empty">
+        <h3>Здесь появится схема</h3>
+        <p>Выберите картинку слева. Сервис разложит её на стразы, подберёт цвета DMC и соберёт комплект файлов: схему для печати, вид мозаики, легенду и макет.</p>
+        <p class="muted">Картинка обрабатывается прямо в браузере и никуда не отправляется.</p>
+      </div>
+      <div class="holder" id="holder" hidden></div>
+    </div>
+  </main>
+
+  <script src="js/palette-dmc.js"></script>
+  <script src="js/files.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

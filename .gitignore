@@ -1,0 +1,4 @@
+# не публикуем: служебное и данные из чужой программы
+.claude/
+.DS_Store
+data/etalon-26-cvetov.csv
