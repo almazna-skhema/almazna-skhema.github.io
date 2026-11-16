@@ -3,6 +3,8 @@
 (function (A) {
   'use strict';
   const UK = {
+    "Основные размеры": "Основні розміри",
+    "Другие размеры": "Інші розміри",
     "Чётко выйдет до ": "Чітко вийде до ",
     "Скачать": "Завантажити",
     "точек": "точок",
@@ -440,7 +442,7 @@
       const v = UK[key];
       if (v !== undefined) n.nodeValue = raw.replace(key, v);
     });
-    ['title', 'placeholder', 'aria-label'].forEach(function (attr) {
+    ['title', 'placeholder', 'aria-label', 'label'].forEach(function (attr) {
       root.querySelectorAll('[' + attr + ']').forEach(function (e) {
         const v = UK[e.getAttribute(attr)];
         if (v !== undefined) e.setAttribute(attr, v);

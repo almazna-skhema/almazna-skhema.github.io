@@ -4,8 +4,8 @@
   'use strict';
 
   const T = A.T;
-  const ASSET_VERSION = 21; // тот же номер, что в адресах скриптов в canvas.html
-  const VERSION = T('версия') + ' 21 · 16.11.2026';
+  const ASSET_VERSION = 22; // тот же номер, что в адресах скриптов в canvas.html
+  const VERSION = T('версия') + ' 22 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // телефоны и планшеты не держат большие холсты в памяти — там пределы скромнее
   const COARSE = !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -28,7 +28,7 @@
   // ---------- настройки ----------
   function params() {
     return {
-      w: clamp(parseFloat($('wCm').value) || 60, 5, 300), h: clamp(parseFloat($('hCm').value) || 40, 5, 300),
+      w: clamp(parseFloat($('wCm').value) || 50, 5, 300), h: clamp(parseFloat($('hCm').value) || 40, 5, 300),
       wrap: clamp(parseFloat(String($('wrap').value).replace(',', '.')) || 0, 0, 10),
       wrapMode: $('wrapMode').value, wrapColor: $('wrapColor').value,
       zoom: clamp(+$('zoom').value / 100, 1, 4), fx: state.fx, fy: state.fy,
