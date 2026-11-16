@@ -516,11 +516,18 @@
       const s = over.symbols && over.symbols.get(g.item.code);
       if (s && !used.has(s)) { g.symbol = s; used.add(s); }
     });
-    let next = 0;
-    list.forEach(function (g) {
+    // Остальные цвета держат свой значок по месту в списке: смена значка у одного цвета
+    // не должна перенумеровывать все прочие. Сдвигается только тот, чей значок заняли.
+    const late = [];
+    list.forEach(function (g, pos) {
       if (g.symbol) return;
-      while (next < ALL_SYMBOLS.length && used.has(ALL_SYMBOLS[next])) next++;
-      g.symbol = ALL_SYMBOLS[next] || '?';
+      const own = ALL_SYMBOLS[pos];
+      if (own !== undefined && !used.has(own)) { g.symbol = own; used.add(own); } else late.push(g);
+    });
+    let next = 0;
+    late.forEach(function (g) {
+      while (next < LIBRARY.length && used.has(LIBRARY[next])) next++;
+      g.symbol = LIBRARY[next] || '?';
       used.add(g.symbol);
     });
     const colors = list.map(function (g, pos) {

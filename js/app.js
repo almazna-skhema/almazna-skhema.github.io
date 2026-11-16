@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 17 · 16.11.2026';
+  const VERSION = T('версия') + ' 18 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
