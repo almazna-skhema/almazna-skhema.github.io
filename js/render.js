@@ -142,6 +142,60 @@
       else x.rect(cx - r * 0.68, cy - r * 0.68, r * 1.36, r * 1.36);
       x.stroke();
       return true;
+    } else if (sym === '▶' || sym === '◀') {
+      const d = sym === '▶' ? 1 : -1;
+      x.moveTo(cx + r * 0.95 * d, cy);
+      x.lineTo(cx - r * 0.8 * d, cy - r);
+      x.lineTo(cx - r * 0.8 * d, cy + r);
+      x.closePath();
+    } else if (sym === '◢' || sym === '◣') {
+      const d = sym === '◢' ? 1 : -1;
+      x.moveTo(cx + r * 0.85 * d, cy - r * 0.85);
+      x.lineTo(cx + r * 0.85 * d, cy + r * 0.85);
+      x.lineTo(cx - r * 0.85 * d, cy + r * 0.85);
+      x.closePath();
+    } else if (sym === '⬟' || sym === '⬢') {
+      const n = sym === '⬟' ? 5 : 6;
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+        x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      }
+      x.closePath();
+    } else if (sym === '✖') {
+      x.lineWidth = r * 0.5;
+      x.strokeStyle = x.fillStyle;
+      x.lineCap = 'butt';
+      x.moveTo(cx - r * 0.8, cy - r * 0.8); x.lineTo(cx + r * 0.8, cy + r * 0.8);
+      x.moveTo(cx + r * 0.8, cy - r * 0.8); x.lineTo(cx - r * 0.8, cy + r * 0.8);
+      x.stroke();
+      return true;
+    } else if (sym === '◐' || sym === '◑' || sym === '◧' || sym === '◨') {
+      // контур целиком и закрашенная половина
+      const round = sym === '◐' || sym === '◑', left = sym === '◐' || sym === '◧', q = r * 0.85;
+      x.lineWidth = r * 0.22;
+      x.strokeStyle = x.fillStyle;
+      if (round) x.arc(cx, cy, q, 0, Math.PI * 2); else x.rect(cx - q, cy - q, q * 2, q * 2);
+      x.stroke();
+      x.beginPath();
+      if (round) x.arc(cx, cy, q, left ? Math.PI / 2 : -Math.PI / 2, left ? Math.PI * 1.5 : Math.PI / 2);
+      else x.rect(left ? cx - q : cx, cy - q, q, q * 2);
+    } else if (sym === '⊕' || sym === '⊗') {
+      const q = r * 0.85, k = sym === '⊕' ? q : q * 0.707;
+      x.lineWidth = r * 0.24;
+      x.strokeStyle = x.fillStyle;
+      x.arc(cx, cy, q, 0, Math.PI * 2);
+      if (sym === '⊕') { x.moveTo(cx - k, cy); x.lineTo(cx + k, cy); x.moveTo(cx, cy - k); x.lineTo(cx, cy + k); }
+      else { x.moveTo(cx - k, cy - k); x.lineTo(cx + k, cy + k); x.moveTo(cx + k, cy - k); x.lineTo(cx - k, cy + k); }
+      x.stroke();
+      return true;
+    } else if (sym === '◎' || sym === '▣') {
+      const q = r * 0.85;
+      x.lineWidth = r * 0.24;
+      x.strokeStyle = x.fillStyle;
+      if (sym === '◎') x.arc(cx, cy, q, 0, Math.PI * 2); else x.rect(cx - q, cy - q, q * 2, q * 2);
+      x.stroke();
+      x.beginPath();
+      if (sym === '◎') x.arc(cx, cy, q * 0.42, 0, Math.PI * 2); else x.rect(cx - q * 0.45, cy - q * 0.45, q * 0.9, q * 0.9);
     } else return false;
     x.fill();
     return true;
@@ -149,7 +203,7 @@
 
   function drawSymbol(x, c, cx, cy, size) {
     x.fillStyle = c.faint ? '#c4c4c4' : c.dark ? '#ffffff' : '#000000';
-    if (c.symbol.length === 1 && A.SHAPES && A.SHAPES.indexOf(c.symbol) >= 0 && drawShape(x, c.symbol, cx, cy, size * 0.47)) return;
+    if (c.symbol.length === 1 && A.SHAPES && (A.SHAPES.indexOf(c.symbol) >= 0 || A.MORE_SHAPES.indexOf(c.symbol) >= 0) && drawShape(x, c.symbol, cx, cy, size * 0.47)) return;
     x.font = 'bold ' + Math.round(size) + 'px ' + FONT;
     x.textAlign = 'center';
     x.textBaseline = 'alphabetic';
@@ -167,6 +221,10 @@
     });
   }
 
+  /* Размер значка в клетке схемы: 1 — обычный, больше — крупнее (но не шире самой клетки). */
+  let symbolScale = 1;
+  function setSymbolScale(k) { symbolScale = Math.max(0.8, Math.min(1.3, +k || 1)); }
+
   function symbolSprite(c, s, shape) {
     const cv = A.makeCanvas(s, s), x = cv.getContext('2d');
     if (shape === 'round') {
@@ -180,7 +238,7 @@
       x.fillStyle = c.hex;
       x.fillRect(0, 0, s, s);
     }
-    if (s >= 9) drawSymbol(x, c, s / 2, s / 2, s * 0.78);
+    if (s >= 9) drawSymbol(x, c, s / 2, s / 2, s * Math.min(0.98, 0.78 * symbolScale));
     return cv;
   }
 
@@ -631,6 +689,7 @@
   A.layoutCells = layoutCells;
   A.grams = grams;
   A.renderInsert = renderInsert;
+  A.setSymbolScale = setSymbolScale;
   A.renderLabels = renderLabels;
   A.INSERT_PX_PER_MM = INSERT_W / 210;
 })(window.ALMAZ = window.ALMAZ || {});

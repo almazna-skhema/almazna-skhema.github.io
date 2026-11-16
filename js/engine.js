@@ -10,6 +10,11 @@
    * плохо читается. На схеме рисуются контуром, а не шрифтом. */
   const SHAPES = '●■▲▼◆★♥✚○□'.split('');
   const ALL_SYMBOLS = SYMBOLS.concat(SHAPES);
+  /* Дополнительная библиотека: её значки назначаются только вручную. Фигуры рисуются контуром,
+   * буквы — шрифтом (греческие и кириллица, не похожие на латинские из основного набора). */
+  const MORE_SHAPES = '▶◀◢◣⬟⬢✖◐◑◧◨⊕⊗◎▣'.split('');
+  const MORE_LETTERS = 'ΔΣΦΨΩλπβθЖЯЮФШЭБДЛП'.split('');
+  const LIBRARY = ALL_SYMBOLS.concat(MORE_SHAPES, MORE_LETTERS);
   /* «Без страз»: клетка не выкладывается, на холсте там остаётся напечатанная картинка. */
   const EMPTY = '__empty__', EMPTY_CELL = 255;
   const MAX_PALETTE = 3000; // больше цветов в таблице не бывает, а расчёт начинает тормозить
@@ -551,6 +556,9 @@
   A.EMPTY = EMPTY;
   A.EMPTY_CELL = EMPTY_CELL;
   A.ALL_SYMBOLS = ALL_SYMBOLS;
+  A.MORE_SHAPES = MORE_SHAPES;
+  A.MORE_LETTERS = MORE_LETTERS;
+  A.LIBRARY = LIBRARY;
   A.MAX_COLORS = MAX_COLORS;
   A.MAX_PALETTE = MAX_PALETTE;
   A.parsePalette = parsePalette;

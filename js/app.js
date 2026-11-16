@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 13 · 16.11.2026';
+  const VERSION = T('версия') + ' 14 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -22,9 +22,9 @@
     print: new Map(),                              // номер цвета → цвет клетки на схеме (#rrggbb)
     brush: { on: false, code: null, size: 1, tool: 'brush', under: false }
   };
-  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels', 'reserve'];
+  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels', 'reserve', 'symSize'];
   // что входит в проект (настройки одной картинки)
-  const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight', 'reserve'];
+  const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight', 'reserve', 'symSize'];
   const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057', minCount: 0, lines: '0', autoLight: '0', reserve: 0 };
   const FILE_NAMES = { mosaic: T('Вид мозаики.png'), scheme: T('Схема для печати.png'), legend: T('Легенда.png'), layout: T('Макет.png'), insert: T('Вкладыш в набор.png') };
   const MAX_CM = 200; // самый большой холст по одной стороне
@@ -79,7 +79,10 @@
 
   function readReserve() { return clamp(parseInt($('reserve').value, 10) || 0, 0, 50); }
 
+  function applySymbolSize() { A.setSymbolScale(+$('symSize').value / 100); }
+
   function params() {
+    applySymbolSize();
     const shape = document.querySelector('input[name=shape]:checked').value;
     const pitch = shape === 'round' ? 2.8 : 2.5;
     const wCm = clamp(parseFloat($('wCm').value) || DEFAULTS.wCm, 5, MAX_CM);
@@ -989,7 +992,7 @@
   function readMarks(o) {
     if (!o || typeof o !== 'object') return;
     (Array.isArray(o.symbols) ? o.symbols : []).slice(0, 200).forEach(function (pair) {
-      if (Array.isArray(pair) && okCode(pair[0]) && A.ALL_SYMBOLS.indexOf(pair[1]) >= 0) state.symbols.set(pair[0], pair[1]);
+      if (Array.isArray(pair) && okCode(pair[0]) && A.LIBRARY.indexOf(pair[1]) >= 0) state.symbols.set(pair[0], pair[1]);
     });
     (Array.isArray(o.print) ? o.print : []).slice(0, 200).forEach(function (pair) {
       if (Array.isArray(pair) && okCode(pair[0]) && /^#[0-9a-f]{6}$/i.test(pair[1])) state.print.set(pair[0], pair[1].toLowerCase());
@@ -1050,7 +1053,7 @@
     list.textContent = '';
     const owner = new Map();
     state.res.colors.forEach(function (o) { if (o.code !== c.code) owner.set(o.symbol, o.code); });
-    A.SHAPES.concat(A.SYMBOLS).forEach(function (sym) {
+    A.SHAPES.concat(A.MORE_SHAPES, A.SYMBOLS, A.MORE_LETTERS).forEach(function (sym) {
       const taken = owner.get(sym);
       const b = el('button', 'sym-item' + (sym === c.symbol ? ' current' : '') + (taken ? ' used' : ''), sym);
       b.type = 'button';
@@ -2358,6 +2361,13 @@
     $('withPdf').addEventListener('change', saveSettings);
     $('withJpg').addEventListener('change', saveSettings);
     $('withLabels').addEventListener('change', saveSettings);
+    $('symSize').addEventListener('change', function () {
+      saveSettings();
+      applySymbolSize();
+      dropCache(['scheme', 'layout']);
+      showTab();
+      touch();
+    });
     $('stock').addEventListener('input', showStockNote);
 
     // этапы и панели

@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer">
   <title>Алмазная схема</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bea'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
   <svg class="sprite" aria-hidden="true">
@@ -212,6 +212,14 @@
           <p class="hint">Макет одним файлом JPEG, названным по артикулу и названию, — в таком виде его берёт типография. Цвета в RGB.</p>
           <label class="check"><input type="checkbox" id="withPdf"><span>Добавить в комплект PDF</span></label>
           <p class="hint">Макет и схема в PDF с точным размером листа — если типография просит PDF.</p>
+          <label>Размер значков на схеме
+            <select id="symSize">
+              <option value="100">Обычный</option>
+              <option value="112">Крупнее</option>
+              <option value="125">Самый крупный</option>
+            </select>
+          </label>
+          <p class="hint">Насколько большим рисовать значок в клетке схемы и макета. «Самый крупный» занимает почти всю клетку.</p>
           <label>Запас страз, %
             <input type="number" id="reserve" min="0" max="50" step="1" value="0" data-kind="meta">
           </label>
@@ -345,11 +353,11 @@
 
   <div class="tip" id="tip" role="tooltip" hidden></div>
 
-  <script src="js/i18n.js?v=13"></script>
-  <script src="js/palette-dmc.js?v=13"></script>
-  <script src="js/files.js?v=13"></script>
-  <script src="js/engine.js?v=13"></script>
-  <script src="js/render.js?v=13"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/i18n.js?v=14"></script>
+  <script src="js/palette-dmc.js?v=14"></script>
+  <script src="js/files.js?v=14"></script>
+  <script src="js/engine.js?v=14"></script>
+  <script src="js/render.js?v=14"></script>
+  <script src="js/app.js?v=14"></script>
 </body>
 </html>
