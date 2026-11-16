@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; base-uri 'none'; form-action 'none'">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Фото на холсте</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234a67d6'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css?v=21">
+</head>
+<body class="poster">
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-rot-l" viewBox="0 0 24 24"><path d="M4 5v5h5M5 10a8 8 0 1 1 2 7"/></symbol>
+    <symbol id="i-rot-r" viewBox="0 0 24 24"><path d="M20 5v5h-5M19 10a8 8 0 1 0-2 7"/></symbol>
+    <symbol id="i-flip-h" viewBox="0 0 24 24"><path d="M12 3v18M8 7l-5 5 5 5V7zM16 7l5 5-5 5V7z"/></symbol>
+    <symbol id="i-flip-v" viewBox="0 0 24 24"><path d="M3 12h18M7 8l5-5 5 5H7zM7 16l5 5 5-5H7z"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 12l4 4-4 4M21 16H7"/></symbol>
+  </svg>
+
+  <aside class="panel" id="panel">
+    <header class="brand">
+      <div class="brand-mark" aria-hidden="true">◆</div>
+      <div>
+        <h1>Фото на холсте</h1>
+        <p>Фото → макет для печати на холсте или постере</p>
+      </div>
+      <div class="lang" role="group" aria-label="Язык">
+        <button type="button" data-lang="uk" aria-pressed="false" title="Українська">UA</button>
+        <button type="button" data-lang="ru" aria-pressed="false" title="Русский">RU</button>
+      </div>
+    </header>
+
+    <nav class="sections" aria-label="Разделы сервиса">
+      <a href="index.html">Алмазная схема</a>
+      <a href="canvas.html" aria-current="page">Фото на холсте</a>
+    </nav>
+
+    <nav class="stepper four" aria-label="Этапы работы">
+      <button type="button" data-go="1" aria-current="step"><span>1</span>Фото</button>
+      <button type="button" data-go="2" disabled><span>2</span>Размер</button>
+      <button type="button" data-go="3" disabled><span>3</span>Обработка</button>
+      <button type="button" data-go="4" disabled><span>4</span>Файл</button>
+    </nav>
+
+    <div class="steps" id="steps">
+      <section class="step" data-step="1">
+        <h2>Выберите фото</h2>
+        <p class="lead">Фото заказчика, из которого получится картина или постер.</p>
+        <input type="file" id="file" class="vh" accept="image/*" tabindex="-1" aria-hidden="true">
+        <button type="button" class="drop" id="drop">
+          <span class="drop-thumb" id="dropThumb" aria-hidden="true">＋</span>
+          <span class="drop-text">
+            <b id="dropTitle">Выбрать фото</b>
+            <small id="dropHint">или перетащите файл, или вставьте из буфера (Ctrl+V)</small>
+          </span>
+        </button>
+        <div class="image-tools" id="imageTools" hidden>
+          <div class="row tight">
+            <button type="button" class="icon" id="rotL" title="Повернуть влево" aria-label="Повернуть влево"><svg class="ic" aria-hidden="true"><use href="#i-rot-l"></use></svg></button>
+            <button type="button" class="icon" id="rotR" title="Повернуть вправо" aria-label="Повернуть вправо"><svg class="ic" aria-hidden="true"><use href="#i-rot-r"></use></svg></button>
+            <button type="button" class="icon" id="flipH" title="Отразить слева направо" aria-label="Отразить слева направо"><svg class="ic" aria-hidden="true"><use href="#i-flip-h"></use></svg></button>
+            <button type="button" class="icon" id="flipV" title="Отразить сверху вниз" aria-label="Отразить сверху вниз"><svg class="ic" aria-hidden="true"><use href="#i-flip-v"></use></svg></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="step" data-step="2" hidden>
+        <h2>Размер и кадр</h2>
+        <p class="lead">Размер готовой картины и то, какая часть фото в неё попадёт.</p>
+        <label>Размер
+          <select id="sizePreset">
+            <option value="20x30">30 × 20 см</option>
+            <option value="30x40">40 × 30 см</option>
+            <option value="30x50">50 × 30 см</option>
+            <option value="40x50">50 × 40 см</option>
+            <option value="40x60" selected>60 × 40 см</option>
+            <option value="50x70">70 × 50 см</option>
+            <option value="50x80">80 × 50 см</option>
+            <option value="60x80">80 × 60 см</option>
+            <option value="50x90">90 × 50 см</option>
+            <option value="60x90">90 × 60 см</option>
+            <option value="70x90">90 × 70 см</option>
+            <option value="70x100">100 × 70 см</option>
+            <option value="80x100">100 × 80 см</option>
+            <option value="80x120">120 × 80 см</option>
+            <option value="custom">Свой размер</option>
+          </select>
+        </label>
+        <div class="row">
+          <label>Ширина, см <input type="number" id="wCm" min="5" max="300" step="1" value="60"></label>
+          <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст"><svg class="ic" aria-hidden="true"><use href="#i-swap"></use></svg></button>
+          <label>Высота, см <input type="number" id="hCm" min="5" max="300" step="1" value="40"></label>
+        </div>
+        <label>Приблизить фото <output id="zoomOut">100%</output>
+          <input type="range" id="zoom" min="100" max="400" value="100">
+        </label>
+        <p class="hint">Двигайте фото мышью или пальцем прямо на макете, чтобы выбрать кадр. Масштаб — этим ползунком или колесом мыши с Ctrl.</p>
+        <label>Торцы подрамника, см
+          <input type="number" id="wrap" min="0" max="10" step="0.5" value="4">
+        </label>
+        <p class="hint">Сколько сантиметров полотна уходит на боковые стороны подрамника при натяжке. Для постера без подрамника поставьте 0.</p>
+        <label>Чем заполнить торцы
+          <select id="wrapMode">
+            <option value="mirror">Зеркальное отражение края</option>
+            <option value="extend">Продолжение фото</option>
+            <option value="color">Один цвет</option>
+          </select>
+        </label>
+        <p class="hint">«Зеркало» сохраняет весь кадр на лицевой стороне. «Продолжение» загибает на торцы часть самого фото — важное у края окажется сбоку. «Один цвет» — ровная заливка.</p>
+        <label class="inline" id="wrapColorRow" hidden>Цвет торцов <input type="color" id="wrapColor" value="#ffffff"></label>
+      </section>
+
+      <section class="step" data-step="3" hidden>
+        <h2>Обработка</h2>
+        <p class="lead">Свет, цвет и подпись. Этот шаг можно пропустить.</p>
+        <label>Яркость <output id="brightnessOut">0</output>
+          <input type="range" id="brightness" min="-50" max="50" value="0"></label>
+        <label>Контраст <output id="contrastOut">0</output>
+          <input type="range" id="contrast" min="-50" max="50" value="0"></label>
+        <label>Насыщенность <output id="saturationOut">0</output>
+          <input type="range" id="saturation" min="-100" max="100" value="0"></label>
+        <label>Тон
+          <select id="tone">
+            <option value="color">Цветная</option>
+            <option value="bw">Чёрно-белая</option>
+            <option value="sepia">Сепия</option>
+          </select>
+        </label>
+        <button type="button" class="link" id="resetAdjust">Сбросить обработку</button>
+        <details>
+          <summary>Подпись на картине</summary>
+          <label>Текст
+            <textarea id="caption" rows="2" maxlength="200" placeholder="Наша родина · літо 2026"></textarea>
+          </label>
+          <div class="row">
+            <label>Место
+              <select id="captionPos">
+                <option value="bottom">Внизу</option>
+                <option value="top">Вверху</option>
+                <option value="center">По центру</option>
+              </select>
+            </label>
+            <label class="inline">Цвет <input type="color" id="captionColor" value="#ffffff"></label>
+          </div>
+          <label>Размер подписи <output id="captionSizeOut">6</output>
+            <input type="range" id="captionSize" min="2" max="16" value="6"></label>
+        </details>
+      </section>
+
+      <section class="step" data-step="4" hidden>
+        <h2>Файл для печати</h2>
+        <p class="lead">Готовый макет одним файлом, с торцами и в нужном разрешении.</p>
+        <label>Номер заказа или название
+          <input type="text" id="order" maxlength="60" placeholder="1234">
+        </label>
+        <p class="hint">Станет именем файла, например «1234 60x40.jpg».</p>
+        <label>Цвет файла
+          <select id="colorMode">
+            <option value="cmyk">CMYK — для типографии</option>
+            <option value="rgb">RGB — для цифровой печати</option>
+          </select>
+        </label>
+        <p class="hint">CMYK — как в файлах для типографии (мелованная бумага, FOGRA39). RGB берут, если печатник просит обычный JPEG.</p>
+        <p class="stats" id="fileInfo"></p>
+      </section>
+    </div>
+
+    <footer class="actions">
+      <div class="quality" id="quality" hidden></div>
+      <div class="nav">
+        <button type="button" id="stepBack" hidden>← Назад</button>
+        <button type="button" class="primary" id="stepNext" disabled>Далее →</button>
+        <button type="button" class="primary" id="save" disabled hidden><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>Скачать файл для печати</span></button>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite">Загрузите фото, чтобы начать</p>
+      <p class="foot"><span id="version"></span></p>
+    </footer>
+  </aside>
+
+  <main>
+    <nav class="toolbar">
+      <button type="button" class="icon" id="panelToggle" aria-pressed="true" title="Скрыть или показать настройки" aria-label="Скрыть или показать настройки"><svg class="ic" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+      <div class="tablist" role="tablist" aria-label="Что показать">
+        <button role="tab" data-tab="layout" aria-selected="true">Макет</button>
+        <button role="tab" data-tab="wall" aria-selected="false">На стене</button>
+      </div>
+      <div class="tools">
+        <button type="button" class="toggle" id="saveTop" aria-pressed="true" disabled title="Скачать файл для печати"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>Скачать</span></button>
+      </div>
+    </nav>
+    <div class="stage" id="stage">
+      <div class="empty" id="empty">
+        <h3>Перетащите сюда фото</h3>
+        <p>Сервис подготовит макет для печати на холсте или постере: кадр, торцы подрамника и файл в нужном разрешении.</p>
+        <button type="button" class="primary" id="emptyPick">Выбрать фото</button>
+        <small>Подойдут JPG, PNG, WebP. Фото обрабатывается в вашем браузере и никуда не отправляется.</small>
+      </div>
+      <div class="holder" id="holder" hidden></div>
+    </div>
+  </main>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+
+  <script src="js/i18n.js?v=21"></script>
+  <script src="js/files.js?v=21"></script>
+  <script src="js/engine.js?v=21"></script>
+  <script src="js/canvas-app.js?v=21"></script>
+</body>
+</html>

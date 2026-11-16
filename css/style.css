@@ -82,6 +82,21 @@ body.hide-panel .panel { display: none; }
 .lang button { border: 0; border-radius: 0; padding: 5px 8px; font-size: 12px; font-weight: 600; color: var(--muted); background: none; }
 .lang button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 
+/* разделы сервиса: мозаика и фото на холсте */
+.sections { display: flex; gap: 4px; padding: 3px; margin-bottom: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 10px; }
+.sections a { flex: 1; text-align: center; padding: 7px 6px; border-radius: 7px; font-size: 13px; color: var(--muted); text-decoration: none; }
+.sections a:hover { color: var(--ink); }
+.sections a[aria-current="page"] { background: var(--panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(20, 30, 60, 0.16); }
+.stepper.four { grid-template-columns: repeat(4, 1fr); }
+.stepper.four::before { left: 12.5%; right: 12.5%; }
+.actions .quality { margin-bottom: 8px; }
+.quality { font-size: 12.5px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; background: var(--field); border: 1px solid var(--line); color: var(--ok); }
+.quality.warn { color: var(--ink); border-color: #d9a520; }
+.quality.bad { color: var(--danger); border-color: var(--danger); font-weight: 600; }
+body.poster .stage.pannable .holder canvas { cursor: grab; }
+body.poster .tools button > .ic + span { display: inline; } /* единственная кнопка — подпись оставляем и на телефоне */
+body.poster .stage.panning .holder canvas { cursor: grabbing; }
+
 /* этапы: наверху пять кнопок, под ними — настройки только выбранного этапа */
 .stepper { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 4px 0 12px; position: relative; }
 .stepper::before { content: ""; position: absolute; left: 10%; right: 10%; top: 17px; height: 2px; background: var(--line); }
@@ -417,7 +432,8 @@ input[type="color"] { width: 44px; height: 30px; padding: 0; border: 1px solid v
   }
   .pick { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
   /* рисуют по схеме — ей нужен весь экран: от панели остаются только «Назад» и «Далее» */
-  body.painting .brand, body.painting .stepper, body.painting .steps, body.painting .status { display: none; }
+  body.painting .brand, body.painting .sections, body.painting .stepper, body.painting .steps, body.painting .status { display: none; }
+  .sections { margin-bottom: 8px; }
   body.painting .panel { padding-top: 0; }
   body.painting .actions { border-top: 0; }
 }
