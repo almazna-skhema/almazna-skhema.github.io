@@ -126,6 +126,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0; }
 
 .row { display: flex; gap: 8px; align-items: flex-end; }
 .row label { flex: 1; min-width: 0; }
+.row.tight { gap: 6px; align-items: center; }
+.row.tight select { flex: 1; min-width: 0; }
 
 button {
   font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line);

@@ -10,6 +10,8 @@
    * плохо читается. На схеме рисуются контуром, а не шрифтом. */
   const SHAPES = '●■▲▼◆★♥✚○□'.split('');
   const ALL_SYMBOLS = SYMBOLS.concat(SHAPES);
+  /* «Без страз»: клетка не выкладывается, на холсте там остаётся напечатанная картинка. */
+  const EMPTY = '__empty__', EMPTY_CELL = 255;
   const MAX_PALETTE = 3000; // больше цветов в таблице не бывает, а расчёт начинает тормозить
 
   // ---------- цвет: sRGB -> Oklab (расстояния в нём близки к восприятию глазом) ----------
@@ -467,10 +469,12 @@
     }
     const selG = new Int32Array(sel.length).fill(-1);
     const cellG = new Int32Array(n);
+    let empty = 0;
     for (let i = 0; i < n; i++) {
       let g = -1;
       if (paint) {
         const code = paint.get(i);
+        if (code === EMPTY) { cellG[i] = -1; empty++; continue; }
         if (code !== undefined) {
           g = painted.get(code);
           if (g === undefined) {
@@ -527,8 +531,8 @@
       };
     });
     const cells = new Uint8Array(n);
-    for (let i = 0; i < n; i++) cells[i] = groups[cellG[i]].pos;
-    return { cols: core.cols, rows: core.rows, cells: cells, colors: colors, picked: core.picked };
+    for (let i = 0; i < n; i++) cells[i] = cellG[i] < 0 ? EMPTY_CELL : groups[cellG[i]].pos;
+    return { cols: core.cols, rows: core.rows, cells: cells, colors: colors, picked: core.picked, empty: empty };
   }
 
   function isDark(c) { return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b < 140; }
@@ -544,6 +548,8 @@
 
   A.SYMBOLS = SYMBOLS;
   A.SHAPES = SHAPES;
+  A.EMPTY = EMPTY;
+  A.EMPTY_CELL = EMPTY_CELL;
   A.ALL_SYMBOLS = ALL_SYMBOLS;
   A.MAX_COLORS = MAX_COLORS;
   A.MAX_PALETTE = MAX_PALETTE;

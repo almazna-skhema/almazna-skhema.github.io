@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 9 · 16.11.2026';
+  const VERSION = T('версия') + ' 11 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -12,7 +12,8 @@
   let palNote = '';          // что не удалось прочитать в загруженной таблице
   let wantColors = 26;       // сколько цветов просил пользователь (таблица может вместить меньше)
   const state = {
-    img: null, imgUrl: '', imgName: '', imgBlob: null, imgId: '', thumb: null, logos: [], prevTab: 'mosaic',
+    img: null, raw: null, imgUrl: '', imgName: '', imgBlob: null, imgId: '', thumb: null, logos: [], prevTab: 'mosaic',
+    tf: { rot: 0, flipX: false, flipY: false, tone: 'color' }, // подготовка картинки: поворот, отражение, тон
     res: null, core: null, p: null, tab: 'mosaic', zoom: 1, cache: {},
     focusX: 0.5, focusY: 0.5, highlightCode: null, excluded: new Set(), replaced: new Map(), busy: false,
     paint: { cols: 0, rows: 0, cells: new Map() }, // прорисовка кистью: номер клетки → номер цвета
@@ -21,11 +22,12 @@
     print: new Map(),                              // номер цвета → цвет клетки на схеме (#rrggbb)
     brush: { on: false, code: null, size: 1, tool: 'brush', under: false }
   };
-  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf'];
+  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels'];
   // что входит в проект (настройки одной картинки)
   const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight'];
   const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057', minCount: 0, lines: '0', autoLight: '0' };
-  const FILE_NAMES = { mosaic: T('Вид мозаики.png'), scheme: T('Схема для печати.png'), legend: T('Легенда.png'), layout: T('Макет.png') };
+  const FILE_NAMES = { mosaic: T('Вид мозаики.png'), scheme: T('Схема для печати.png'), legend: T('Легенда.png'), layout: T('Макет.png'), insert: T('Вкладыш в набор.png') };
+  const MAX_CM = 200; // самый большой холст по одной стороне
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
   const MAX_IMAGE_PIXELS = 150e6;
   const PICK_LIMIT = 120; // сколько цветов показывать в окне замены
@@ -68,8 +70,8 @@
   function params() {
     const shape = document.querySelector('input[name=shape]:checked').value;
     const pitch = shape === 'round' ? 2.8 : 2.5;
-    const wCm = clamp(parseFloat($('wCm').value) || DEFAULTS.wCm, 5, 120);
-    const hCm = clamp(parseFloat($('hCm').value) || DEFAULTS.hCm, 5, 120);
+    const wCm = clamp(parseFloat($('wCm').value) || DEFAULTS.wCm, 5, MAX_CM);
+    const hCm = clamp(parseFloat($('hCm').value) || DEFAULTS.hCm, 5, MAX_CM);
     return {
       shape: shape, pitch: pitch, wCm: wCm, hCm: hCm,
       cols: Math.max(4, Math.round((wCm * 10) / pitch)),
@@ -96,7 +98,7 @@
   /* Приводит поля к допустимым значениям, чтобы на экране было то, что реально считается. */
   function normalizeInputs() {
     ['wCm', 'hCm'].forEach(function (id) {
-      const v = clamp(parseFloat($(id).value) || DEFAULTS[id], 5, 120);
+      const v = clamp(parseFloat($(id).value) || DEFAULTS[id], 5, MAX_CM);
       if (String(v) !== $(id).value) $(id).value = v;
     });
     $('gram').value = String(readGram()).replace('.', ',');
@@ -310,7 +312,7 @@
 
   function afterResult() {
     if (highlightIndex() < 0) state.highlightCode = null;
-    dropCache(['mosaic', 'scheme', 'legend', 'layout']); // исходник от правок не меняется
+    dropCache(['mosaic', 'scheme', 'legend', 'layout', 'insert']); // исходник от правок не меняется
     updateStats();
     renderColorList();
     updateBrushBar();
@@ -332,7 +334,7 @@
     if (!state.res) return;
     const gramBefore = state.p.gramPerStone;
     state.p = params();
-    dropCache(['legend', 'layout']);
+    dropCache(['legend', 'layout', 'insert']);
     updateStats();
     if (state.p.gramPerStone !== gramBefore) renderColorList();
     showTab();
@@ -357,17 +359,23 @@
       const iw = state.img.naturalWidth, ih = state.img.naturalHeight;
       const k = clamp(Math.floor(1600 / Math.max(p.cols, p.rows)), 2, 8);
       cv = A.downscale(state.img, A.cropRect(iw, ih, p.cols, p.rows, p.focusX, p.focusY), p.cols * k, p.rows * k);
-    } else if (kind === 'mosaic') cv = A.renderMosaic(res, previewCell(kind), p.shape, hi);
-    else if (kind === 'scheme') cv = A.renderScheme(res, previewCell(kind), p.shape, hi);
+    } else if (kind === 'mosaic') cv = A.renderMosaic(res, previewCell(kind), p.shape, hi, underlay());
+    else if (kind === 'scheme') cv = A.renderScheme(res, previewCell(kind), p.shape, hi, underlay());
     else if (kind === 'legend') cv = A.renderLegend(res, p);
+    else if (kind === 'insert') cv = A.renderInsert(res, p, state.img, 0.5);
     else {
       const c = previewCell(kind);
-      const tmp = A.renderScheme(res, c, p.shape);
+      const tmp = A.renderScheme(res, c, p.shape, -1, underlay());
       cv = A.renderLayout(res, p, state.img, c, tmp);
       release(tmp);
     }
     state.cache[kind] = cv;
     return cv;
+  }
+
+  /* Картинка для зон «без страз» — та же, что на вкладке «Оригинал». */
+  function underlay() {
+    return state.res && state.res.empty ? getCanvas('original') : null;
   }
 
   function fitScale(cv) {
@@ -711,6 +719,7 @@
   }
 
   function openBrushPicker() {
+    if (state.brush.code === A.EMPTY) state.brush.code = defaultBrushCode(); // из режима «без страз» — к обычному цвету
     const it = brushItem();
     if (!it || !state.res) return;
     pickFor = it.code;
@@ -763,10 +772,12 @@
     $('brushBar').hidden = !on;
     $('stage').classList.toggle('brush', on);
     if (!on) return;
-    if (b.code === null || !palByCode().has(b.code)) b.code = defaultBrushCode();
+    const none = b.code === A.EMPTY;
+    if (!none && (b.code === null || !palByCode().has(b.code))) b.code = defaultBrushCode();
     const it = brushItem();
-    $('brushSwatch').style.backgroundColor = it.hex;
-    $('brushCode').textContent = it.code;
+    $('brushSwatch').style.backgroundColor = none ? '#ffffff' : it.hex;
+    $('brushCode').textContent = none ? T('без страз') : it.code;
+    $('brushEmpty').setAttribute('aria-pressed', none ? 'true' : 'false');
     $('brushUndo').disabled = !state.undo.length;
     $('brushRedo').disabled = !state.redo.length;
     $('brushUnder').checked = b.under;
@@ -808,7 +819,7 @@
     const cv = $('holder').firstChild, it = brushItem();
     stroke = {
       changes: new Map(), ctx: cv.getContext('2d'), cell: cv.width / state.res.cols,
-      hex: it ? it.hex : '#000000', replace: replaceMap(), drag: false
+      hex: it ? it.hex : '#ffffff', replace: replaceMap(), drag: false
     };
   }
 
@@ -856,7 +867,7 @@
   function flood(cx, cy) {
     const res = state.res, cols = res.cols, rows = res.rows, cells = res.cells;
     const start = cy * cols + cx, target = cells[start];
-    if (res.colors[target].code === state.brush.code) return;
+    if (target === A.EMPTY_CELL ? state.brush.code === A.EMPTY : res.colors[target].code === state.brush.code) return;
     const seen = new Uint8Array(cells.length), stack = [start];
     seen[start] = 1;
     while (stack.length) {
@@ -922,10 +933,11 @@
     if (!c) return false;
     e.preventDefault();
     if (e.altKey || b.tool === 'pipette') { // взять цвет со схемы
-      setBrushCode(res.colors[res.cells[c.y * res.cols + c.x]].code);
+      const picked = res.cells[c.y * res.cols + c.x];
+      setBrushCode(picked === A.EMPTY_CELL ? A.EMPTY : res.colors[picked].code);
       return true;
     }
-    if (b.tool !== 'erase' && !colorByCode(b.code) && res.colors.length >= A.ALL_SYMBOLS.length) {
+    if (b.tool !== 'erase' && b.code !== A.EMPTY && !colorByCode(b.code) && res.colors.length >= A.ALL_SYMBOLS.length) {
       setStatus(T('В схеме уже ') + res.colors.length + T(' цветов — для нового не осталось значка. Возьмите на кисть цвет из списка.'), 'error');
       return true;
     }
@@ -1082,19 +1094,29 @@
   }
 
   /* Холст → PDF: страница точно по размеру листа в миллиметрах. */
-  function canvasPdf(cv, pxPerMm) {
+  function canvasJpegBytes(cv) {
     return new Promise(function (resolve, reject) {
       cv.toBlob(function (blob) {
-        if (!blob) { reject(new Error('Не удалось создать PDF')); return; }
-        blob.arrayBuffer().then(function (buf) {
-          resolve(joinBytes(A.pdfFromJpeg(new Uint8Array(buf), cv.width, cv.height, cv.width / pxPerMm, cv.height / pxPerMm)));
-        }, reject);
+        if (!blob) { reject(new Error('JPEG')); return; }
+        blob.arrayBuffer().then(function (buf) { resolve(new Uint8Array(buf)); }, reject);
       }, 'image/jpeg', 0.95);
     });
   }
 
+  function canvasPdf(cv, pxPerMm) {
+    return canvasJpegBytes(cv).then(function (jpg) {
+      return joinBytes(A.pdfFromJpeg(jpg, cv.width, cv.height, cv.width / pxPerMm, cv.height / pxPerMm));
+    });
+  }
+
+  /* JPEG для типографии: тот же макет одним файлом, с записанным разрешением печати. */
+  function canvasJpeg(cv, pxPerMm) {
+    return canvasJpegBytes(cv).then(function (jpg) { return A.jpegSetDpi(jpg, pxPerMm * 25.4); });
+  }
+
   function exportKinds() {
-    return ['layout', 'scheme', 'mosaic', 'legend', 'csv'].concat($('withPdf').checked ? ['pdf'] : []);
+    return ['layout', 'scheme', 'mosaic', 'legend', 'insert', 'csv']
+      .concat($('withLabels').checked ? ['labels'] : [], $('withJpg').checked ? ['jpg'] : [], $('withPdf').checked ? ['pdf'] : []);
   }
 
   function release(cv) { if (cv) cv.width = cv.height = 0; }
@@ -1143,9 +1165,11 @@
     const cell = safeExportCell(p, res, kinds), pxmm = cell / p.pitch;
     const out = [];
     const pdf = kinds.indexOf('pdf') >= 0; // к схеме и макету добавить PDF с точным размером листа
+    const jpg = kinds.indexOf('jpg') >= 0; // макет ещё и в JPEG — так его берёт типография
     let scheme = null, cv = null;
     try {
-      if (kinds.indexOf('scheme') >= 0 || kinds.indexOf('layout') >= 0) scheme = A.renderScheme(res, cell, p.shape);
+      const under = underlay();
+      if (kinds.indexOf('scheme') >= 0 || kinds.indexOf('layout') >= 0) scheme = A.renderScheme(res, cell, p.shape, -1, under);
       for (const kind of kinds) {
         await wait(20); // даём браузеру обновить надпись о ходе работы
         if (kind === 'csv') {
@@ -1156,14 +1180,24 @@
         } else if (kind === 'layout') {
           cv = A.renderLayout(res, p, img, cell, scheme);
           out.push({ name: FILE_NAMES.layout, data: await canvasPng(cv, pxmm) });
+          if (jpg) out.push({ name: baseName() + '.jpg', data: await canvasJpeg(cv, pxmm) });
           if (pdf) out.push({ name: T('Макет.pdf'), data: await canvasPdf(cv, pxmm) });
         } else if (kind === 'mosaic') {
           const mc = Math.min(cell, 16);
-          cv = A.renderMosaic(res, mc, p.shape);
+          cv = A.renderMosaic(res, mc, p.shape, -1, under);
           out.push({ name: FILE_NAMES.mosaic, data: await canvasPng(cv, mc / p.pitch) });
         } else if (kind === 'legend') {
           cv = A.renderLegend(res, p);
           out.push({ name: FILE_NAMES.legend, data: await canvasPng(cv, 0) });
+        } else if (kind === 'insert') {
+          cv = A.renderInsert(res, p, img, 1);
+          out.push({ name: FILE_NAMES.insert, data: await canvasPng(cv, A.INSERT_PX_PER_MM) });
+        } else if (kind === 'labels') {
+          const pages = A.renderLabels(res, p);
+          for (let i = 0; i < pages.length; i++) {
+            out.push({ name: T('Наклейки на пакетики') + (pages.length > 1 ? ' ' + (i + 1) : '') + '.png', data: await canvasPng(pages[i], A.INSERT_PX_PER_MM) });
+            release(pages[i]);
+          }
         }
         release(cv);
         cv = null;
@@ -1244,6 +1278,93 @@
     return /^image\//.test(file.type) || IMAGE_EXT.test(file.name);
   }
 
+  /* Рабочая копия картинки: повёрнутая, отражённая, в нужном тоне. Всё остальное
+   * (схема, макет, миниатюры) берётся с неё, оригинал остаётся нетронутым. */
+  function rebuildSource() {
+    const raw = state.raw, tf = state.tf;
+    const iw = raw.naturalWidth, ih = raw.naturalHeight;
+    const k = Math.min(1, 4000 / Math.max(iw, ih)); // больше для схемы не нужно, а память экономит
+    const w = Math.max(1, Math.round(iw * k)), h = Math.max(1, Math.round(ih * k));
+    const turned = tf.rot % 180 !== 0;
+    const cv = A.makeCanvas(turned ? h : w, turned ? w : h), x = cv.getContext('2d', { willReadFrequently: tf.tone !== 'color' });
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.fillStyle = '#ffffff'; // прозрачные места считаем белыми
+    x.fillRect(0, 0, cv.width, cv.height);
+    x.translate(cv.width / 2, cv.height / 2);
+    x.rotate((tf.rot * Math.PI) / 180);
+    x.scale(tf.flipX ? -1 : 1, tf.flipY ? -1 : 1);
+    x.drawImage(raw, -w / 2, -h / 2, w, h);
+    if (tf.tone !== 'color') {
+      const im = x.getImageData(0, 0, cv.width, cv.height), d = im.data, sepia = tf.tone === 'sepia';
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        if (sepia) {
+          d[i] = Math.min(255, 0.393 * r + 0.769 * g + 0.189 * b);
+          d[i + 1] = Math.min(255, 0.349 * r + 0.686 * g + 0.168 * b);
+          d[i + 2] = Math.min(255, 0.272 * r + 0.534 * g + 0.131 * b);
+        } else d[i] = d[i + 1] = d[i + 2] = 0.299 * r + 0.587 * g + 0.114 * b;
+      }
+      x.putImageData(im, 0, 0);
+    }
+    cv.naturalWidth = cv.width;
+    cv.naturalHeight = cv.height;
+    if (state.img && state.img !== raw && state.img.getContext) release(state.img);
+    state.img = cv;
+    release(state.thumb);
+    const tk = Math.min(1, 640 / Math.max(cv.width, cv.height));
+    state.thumb = A.downscale(cv, { x: 0, y: 0, w: cv.width, h: cv.height }, Math.max(1, Math.round(cv.width * tk)), Math.max(1, Math.round(cv.height * tk)));
+    $('tone').value = tf.tone;
+    $('imageTools').hidden = false;
+  }
+
+  /* Поворот, отражение или смена тона: схема пересчитывается, прорисовка кистью привязана
+   * к прежнему положению картинки, поэтому при повороте и отражении её приходится стирать. */
+  function transformImage(change) {
+    if (!state.raw || state.busy) return;
+    const moves = change.rot !== undefined || change.flipX !== undefined || change.flipY !== undefined;
+    if (moves && state.paint.cells.size && !window.confirm(T('Картинка повернётся, и прорисовка кистью будет стёрта. Продолжить?'))) return;
+    const tf = state.tf;
+    if (change.rot !== undefined) {
+      tf.rot = (tf.rot + change.rot + 360) % 360;
+      const w = $('wCm').value;      // холст поворачивается вместе с картинкой
+      $('wCm').value = $('hCm').value;
+      $('hCm').value = w;
+    }
+    if (change.flipX) tf.flipX = !tf.flipX;
+    if (change.flipY) tf.flipY = !tf.flipY;
+    if (change.tone !== undefined) tf.tone = change.tone === 'bw' || change.tone === 'sepia' ? change.tone : 'color';
+    if (moves) {
+      state.paint = { cols: 0, rows: 0, cells: new Map() };
+      state.undo = []; state.redo = [];
+      state.focusX = state.focusY = 0.5;
+    }
+    rebuildSource();
+    const thumb = $('dropThumb');
+    thumb.style.backgroundImage = 'url("' + state.thumb.toDataURL('image/jpeg', 0.8) + '")';
+    syncOutputs();
+    saveSettings();
+    clearTimeout(timer);
+    timer = null;
+    pendingFull = false;
+    recompute();
+  }
+
+  /* Чистый холст: схема рисуется кистью с нуля, без картинки. */
+  function startBlank() {
+    if (state.busy) return;
+    const p = params();
+    const cv = A.makeCanvas(Math.round(p.wCm * 20), Math.round(p.hCm * 20)), x = cv.getContext('2d');
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, cv.width, cv.height);
+    loadImage(cv.toDataURL('image/png'), T('Чистый холст'), false).then(function () {
+      release(cv);
+      setStep(4);
+      if (!state.brush.on) toggleBrush();
+      setStatus(T('Чистый холст готов. Выберите цвет в списке или кнопкой «сменить» и рисуйте.'));
+    }, function () {});
+  }
+
   /* opt.keep — картинка открывается вместе с сохранённой работой: правки и кадр не сбрасываем;
    * opt.blob — исходный файл (для сохранения проекта); opt.id, opt.stored — картинка уже лежит в хранилище. */
   function loadImage(src, name, isBlob, opt) {
@@ -1271,10 +1392,14 @@
           return;
         }
         if (state.imgUrl) URL.revokeObjectURL(state.imgUrl); // прежняя картинка больше не нужна
-        release(state.thumb);
-        state.img = img;
+        release(thumbCanvas);
+        state.raw = img;
+        if (!opt.keep) state.tf = { rot: 0, flipX: false, flipY: false, tone: 'color' };
+        if (state.brush.code === A.EMPTY) state.brush.code = null; // новая картинка — кисть снова красит цветом
+        state.brush.tool = 'brush';
         state.imgUrl = isBlob ? src : '';
-        state.thumb = thumbCanvas;
+        rebuildSource();
+        thumbUrl = state.thumb.toDataURL('image/jpeg', 0.8);
         state.imgName = String(name || '').slice(0, 120);
         state.imgBlob = opt.blob || null;
         state.imgId = opt.id || String(Date.now()) + Math.random().toString(36).slice(2, 8);
@@ -1426,6 +1551,7 @@
       fields: fields, nColors: wantColors,
       shape: document.querySelector('input[name=shape]:checked').value,
       focus: [state.focusX, state.focusY],
+      tf: { rot: state.tf.rot, flipX: state.tf.flipX, flipY: state.tf.flipY, tone: state.tf.tone },
       excluded: Array.from(state.excluded),
       replaced: Array.from(state.replaced),
       paint: { cols: state.paint.cols, rows: state.paint.rows, cells: cells },
@@ -1453,6 +1579,11 @@
     state.focusX = clamp(+fx[0] || 0, 0, 1);
     state.focusY = clamp(+fx[1] || 0, 0, 1);
     if (!Array.isArray(o.focus)) state.focusX = state.focusY = 0.5;
+    const tf = o.tf && typeof o.tf === 'object' ? o.tf : {};
+    state.tf = {
+      rot: [0, 90, 180, 270].indexOf(tf.rot) >= 0 ? tf.rot : 0, flipX: tf.flipX === true, flipY: tf.flipY === true,
+      tone: tf.tone === 'bw' || tf.tone === 'sepia' ? tf.tone : 'color'
+    };
     state.excluded = new Set((Array.isArray(o.excluded) ? o.excluded : []).filter(okCode).slice(0, A.MAX_PALETTE));
     state.replaced = new Map();
     (Array.isArray(o.replaced) ? o.replaced : []).slice(0, 500).forEach(function (pair) {
@@ -1465,7 +1596,7 @@
       paint.rows = pt.rows | 0;
       const total = paint.cols * paint.rows;
       Object.keys(pt.cells).slice(0, 200).forEach(function (code) {
-        if (!okCode(code) || !Array.isArray(pt.cells[code])) return;
+        if (!okCode(code) || !Array.isArray(pt.cells[code])) return; // «без страз» хранится под своим служебным номером
         pt.cells[code].forEach(function (i) { if (Number.isInteger(i) && i >= 0 && i < total) paint.cells.set(i, code); });
       });
     }
@@ -1481,7 +1612,7 @@
   function imageBlob() {
     if (state.imgBlob) return Promise.resolve(state.imgBlob);
     return new Promise(function (resolve, reject) {
-      const img = state.img, cv = A.makeCanvas(img.naturalWidth, img.naturalHeight);
+      const img = state.raw, cv = A.makeCanvas(img.naturalWidth, img.naturalHeight);
       cv.getContext('2d').drawImage(img, 0, 0);
       cv.toBlob(function (b) { release(cv); if (b) resolve(b); else reject(new Error('нет картинки')); }, 'image/png');
     });
@@ -2034,6 +2165,8 @@
     // настройки, которые меняют вид без нового подбора цветов
     $('autoLight').addEventListener('change', function () { saveSettings(); applyOverlays(); });
     $('withPdf').addEventListener('change', saveSettings);
+    $('withJpg').addEventListener('change', saveSettings);
+    $('withLabels').addEventListener('change', saveSettings);
     $('stock').addEventListener('input', showStockNote);
 
     // этапы и панели
@@ -2047,6 +2180,20 @@
     $('colorsToggle').addEventListener('click', function () { setPanels({ colors: !ui.colors }); });
     $('colorsClose').addEventListener('click', function () { setPanels({ colors: false }); });
     $('hintsToggle').addEventListener('click', function () { setPanels({ hints: !ui.hints }); });
+
+    // подготовка картинки, чистый холст, зоны без страз
+    $('rotL').addEventListener('click', function () { transformImage({ rot: -90 }); });
+    $('rotR').addEventListener('click', function () { transformImage({ rot: 90 }); });
+    $('flipH').addEventListener('click', function () { transformImage({ flipX: true }); });
+    $('flipV').addEventListener('click', function () { transformImage({ flipY: true }); });
+    $('tone').addEventListener('change', function (e) { transformImage({ tone: e.target.value }); });
+    $('blankStart').addEventListener('click', startBlank);
+    $('brushEmpty').addEventListener('click', function () {
+      state.brush.code = state.brush.code === A.EMPTY ? defaultBrushCode() : A.EMPTY;
+      if (state.brush.tool === 'erase' || state.brush.tool === 'pipette') state.brush.tool = 'brush';
+      renderColorList();
+      updateBrushBar();
+    });
 
     // проект
     $('projSave').addEventListener('click', saveProject);
@@ -2073,7 +2220,7 @@
     toggleBrush: toggleBrush, setBrushCode: setBrushCode, undoStroke: undoStroke, clearPaint: clearPaint,
     setSymbol: setSymbol, setPrint: setPrint, openSymbols: openSymbols, addLogoFiles: addLogoFiles,
     redoStroke: redoStroke, runBatch: runBatch, saveProject: saveProject, openProjectFile: openProjectFile,
-    setStep: setStep, setPanels: setPanels, ui: ui,
+    setStep: setStep, setPanels: setPanels, ui: ui, transformImage: transformImage, startBlank: startBlank,
     projectData: projectData, autosave: autosave, restoreWork: restoreWork, toggleOriginal: toggleOriginal, exportKinds: exportKinds
   };
   init();

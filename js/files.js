@@ -155,6 +155,20 @@
     return parts;
   }
 
+  /* Записывает разрешение (точек на дюйм) в заголовок JPEG, чтобы файл открывался
+   * в нужном физическом размере. Меняет массив на месте; чужой формат не трогает. */
+  function jpegSetDpi(jpg, dpi) {
+    const ok = jpg.length > 18 && jpg[0] === 0xff && jpg[1] === 0xd8 && jpg[2] === 0xff && jpg[3] === 0xe0 &&
+      jpg[6] === 0x4a && jpg[7] === 0x46 && jpg[8] === 0x49 && jpg[9] === 0x46 && jpg[10] === 0; // «JFIF»
+    if (!ok) return jpg;
+    const d = Math.max(1, Math.min(65535, Math.round(dpi)));
+    jpg[13] = 1; // единица — точки на дюйм
+    jpg[14] = d >> 8; jpg[15] = d & 255;
+    jpg[16] = d >> 8; jpg[17] = d & 255;
+    return jpg;
+  }
+
+  A.jpegSetDpi = jpegSetDpi;
   A.pdfFromJpeg = pdfFromJpeg;
   A.crc32 = crc32;
   A.pngSetDpi = pngSetDpi;
