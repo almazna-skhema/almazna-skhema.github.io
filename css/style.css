@@ -313,6 +313,7 @@ button.toggle[aria-pressed="true"] { background: var(--accent); border-color: va
 .brush-color { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 5px; }
 .brush-color span:last-child { color: var(--accent); font-size: 12.5px; }
 .stage.brush canvas { cursor: crosshair; touch-action: none; }
+.holder canvas { touch-action: none; } /* сдвиг и масштаб пальцами обрабатывает сам сервис */
 .stage.brush { cursor: default; }
 
 .logo-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -368,14 +369,75 @@ input[type="color"] { width: 44px; height: 30px; padding: 0; border: 1px solid v
   .colors { height: auto; max-height: 34vh; border-left: 0; border-top: 1px solid var(--line); }
   #colorList { display: grid; grid-template-columns: repeat(auto-fill, minmax(256px, 1fr)); gap: 2px 14px; }
   .color-head { display: none; }
+  /* вкладки — отдельной строкой: рядом с кнопками им тесно */
+  .toolbar .tablist { flex: 1 1 100%; order: 2; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .toolbar .tablist::-webkit-scrollbar { display: none; }
+  .toolbar .tablist button { white-space: nowrap; }
+  .tools { flex: 1; justify-content: flex-end; }
 }
 
+/* телефон и планшет в книжной ориентации: схема сверху, настройки этапа — снизу,
+   список цветов выезжает поверх по кнопке «Цвета» */
 @media (max-width: 820px) {
-  html, body { height: auto; }
-  body, body.with-colors { display: block; height: auto; }
-  .panel { height: auto; overflow: visible; border-right: 0; border-bottom: 1px solid var(--line); }
-  .actions { position: static; }
-  main { height: auto; }
-  .stage { height: 72vh; }
-  .colors { max-height: none; }
+  body, body.with-colors, body.hide-panel, body.hide-panel.with-colors {
+    display: grid; height: 100vh; height: 100dvh; grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "main" "panel";
+  }
+  body.hide-panel, body.hide-panel.with-colors { grid-template-rows: minmax(0, 1fr); grid-template-areas: "main"; }
+  main { height: auto; min-height: 0; }
+  .panel { height: auto; max-height: 46vh; max-height: 46dvh; border-right: 0; border-top: 1px solid var(--line); padding: 10px 14px 0; }
+  .brand { padding-bottom: 8px; }
+  .brand-mark { width: 28px; height: 28px; font-size: 15px; border-radius: 8px; }
+  .brand h1 { font-size: 15px; }
+  .brand p { display: none; }
+  .stepper { padding: 0 0 8px; }
+  .stepper::before { top: 13px; }
+  .stepper button { font-size: 10.5px; gap: 3px; }
+  .stepper button span { width: 26px; height: 26px; }
+  .step { padding: 10px 0 12px; gap: 9px; }
+  .step h2 { font-size: 15px; }
+  .actions { margin: auto -14px 0; padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); }
+  .foot { display: none; }
+  .status { margin-top: 5px; }
+  .toolbar { padding: 6px 8px; gap: 6px; }
+  .toolbar .tablist { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex: 1 1 100%; order: 2; }
+  .toolbar .tablist::-webkit-scrollbar { display: none; }
+  .toolbar .tablist button { white-space: nowrap; padding: 7px 9px; }
+  .tools { flex: 1; justify-content: flex-end; }
+  .tools button > .ic + span { display: none; } /* на узком экране у кнопок остаются значки */
+  .brushbar { padding: 6px 8px; gap: 6px; }
+  .holder { padding: 10px; }
+  .empty { inset: 10px; padding: 14px; gap: 8px; }
+  .empty h3 { font-size: 17px; }
+  .empty p { display: none; }
+  .colors {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; max-height: 64vh; max-height: 64dvh;
+    border-radius: 14px 14px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.3); padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  .pick { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  /* рисуют по схеме — ей нужен весь экран: от панели остаются только «Назад» и «Далее» */
+  body.painting .brand, body.painting .stepper, body.painting .steps, body.painting .status { display: none; }
+  body.painting .panel { padding-top: 0; }
+  body.painting .actions { border-top: 0; }
+}
+
+/* совсем узкий экран: масштаб — двумя пальцами, кнопки «−» и «+» не нужны */
+@media (max-width: 520px) {
+  #zoomOut, #zoomIn { display: none; }
+}
+
+/* палец вместо мыши: крупнее всё, во что нужно попадать */
+@media (pointer: coarse) {
+  .info { width: 24px; height: 24px; font-size: 13px; }
+  .color-x { width: 34px; height: 34px; }
+  .color-x .ic { width: 17px; height: 17px; }
+  button.icon { width: 40px; height: 40px; }
+  button.zoom-label { height: 40px; }
+  .swatch-btn { width: 32px; height: 32px; }
+  .color-row { padding: 8px 6px; }
+  input[type="text"], input[type="number"], input[type="search"], select, textarea { font-size: 16px; } /* иначе iPhone приближает страницу при вводе */
+  .pick-item { padding: 8px 6px; }
+  .sym-item { height: 44px; }
+  .chip { padding: 7px 11px; }
+  .stepper button span { width: 30px; height: 30px; }
 }

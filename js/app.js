@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 12 · 16.11.2026';
+  const VERSION = T('версия') + ' 13 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -788,6 +788,7 @@
     const on = paintActive();
     $('brushBar').hidden = !on;
     $('stage').classList.toggle('brush', on);
+    document.body.classList.toggle('painting', on); // на телефоне в режиме кисти панель сворачивается до кнопок
     if (!on) return;
     const none = b.code === A.EMPTY;
     if (!none && (b.code === null || !palByCode().has(b.code))) b.code = defaultBrushCode();
@@ -2013,11 +2014,14 @@
   const ui = { step: 1, panel: true, colors: true, hints: true };
   const STEP_NAMES = { 1: 'Картинка', 2: 'Холст', 3: 'Цвета', 4: 'Правка', 5: 'Макет' };
 
+  function isNarrow() { return !!window.matchMedia && window.matchMedia('(max-width: 820px)').matches; }
+
   function loadUi() {
     try {
       const o = JSON.parse(localStorage.getItem('almaz-ui') || 'null');
       if (o && typeof o === 'object') ['panel', 'colors', 'hints'].forEach(function (k) { if (typeof o[k] === 'boolean') ui[k] = o[k]; });
     } catch (e) { /* игнорируем */ }
+    if (isNarrow()) { ui.colors = false; ui.panel = true; } // на телефоне список цветов закрывает экран — он открывается кнопкой
   }
 
   function saveUi() {
@@ -2067,7 +2071,7 @@
       state.brush.on = false;
       renderColorList();
     }
-    if (n === 4 && !ui.colors) setPanels({ colors: true }); // здесь без списка цветов не обойтись
+    if (n === 4 && !ui.colors && !isNarrow()) setPanels({ colors: true }); // здесь без списка цветов не обойтись (на телефоне он открывается кнопкой)
     const want = n === 1 ? 'original' : n === 5 ? 'layout' : paintTab() ? state.tab : 'mosaic';
     if (state.tab !== want) { state.zoom = 1; selectTab(want); } else { updateBrushBar(); showTab(); }
   }
@@ -2249,18 +2253,55 @@
       e.preventDefault();
       setZoom(state.zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY);
     }, { passive: false });
+    // два пальца: сдвиг и масштаб схемы (в том числе в режиме кисти)
+    const touches = new Map();
+    let pinch = null;
+    function pinchState() {
+      const pts = Array.from(touches.values());
+      return { d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y), cx: (pts[0].x + pts[1].x) / 2, cy: (pts[0].y + pts[1].y) / 2 };
+    }
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2 && state.res) {
+        if (stroke) { // первый палец успел поставить точку — убираем её, это был жест, а не мазок
+          const st = stroke;
+          stroke = null;
+          applyChanges(st.changes);
+          applyOverlays();
+        }
+        pinch = Object.assign(pinchState(), { zoom: state.zoom });
+      }
+    }, true);
+    stage.addEventListener('pointermove', function (e) {
+      if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!pinch || touches.size !== 2) return;
+      e.preventDefault();
+      const now = pinchState();
+      stage.scrollLeft -= now.cx - pinch.cx;
+      stage.scrollTop -= now.cy - pinch.cy;
+      if (pinch.d > 10) setZoom(pinch.zoom * (now.d / pinch.d), now.cx, now.cy);
+      pinch.cx = now.cx;
+      pinch.cy = now.cy;
+    }, true);
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      stage.addEventListener(ev, function (e) { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; }, true);
+    });
+
     let pan = null;
     stage.addEventListener('pointerdown', function (e) {
       if (paintDown(e)) return; // в режиме кисти нажатие по схеме рисует, а не двигает её
       const sidePan = paintActive() && (e.button === 1 || e.button === 2); // в режиме кисти двигаем правой или средней кнопкой
-      if ((e.button !== 0 && !sidePan) || e.pointerType === 'touch' || !state.res) return;
+      if ((e.button !== 0 && !sidePan) || !state.res || touches.size > 1) return; // пальцем схему тоже можно двигать
       if (!sidePan && state.zoom <= 1.01) return;
       if (sidePan) e.preventDefault();
       pan = { x: e.clientX, y: e.clientY, left: stage.scrollLeft, top: stage.scrollTop };
       stage.classList.add('panning');
-      stage.setPointerCapture(e.pointerId);
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
     });
     stage.addEventListener('pointermove', function (e) {
+      if (pinch) { pan = null; return; }
       paintMove(e);
       if (!pan) return;
       stage.scrollLeft = pan.left - (e.clientX - pan.x);
