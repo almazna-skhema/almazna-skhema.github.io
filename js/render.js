@@ -63,8 +63,18 @@
     return cv;
   }
 
-  function renderMosaic(res, cellPx, shape) {
-    return drawCells(res, cellPx, res.colors.map(function (c) { return stoneSprite(c, cellPx, shape); }));
+  /* Для подсветки одного цвета: остальные цвета становятся бледными. */
+  function withHighlight(colors, highlight) {
+    if (typeof highlight !== 'number' || highlight < 0) return colors;
+    return colors.map(function (c, i) {
+      if (i === highlight) return c;
+      const r = Math.round(c.r + (255 - c.r) * 0.86), g = Math.round(c.g + (255 - c.g) * 0.86), b = Math.round(c.b + (255 - c.b) * 0.86);
+      return { r: r, g: g, b: b, hex: 'rgb(' + r + ',' + g + ',' + b + ')', symbol: c.symbol, dark: false, faint: true };
+    });
+  }
+
+  function renderMosaic(res, cellPx, shape, highlight) {
+    return drawCells(res, cellPx, withHighlight(res.colors, highlight).map(function (c) { return stoneSprite(c, cellPx, shape); }));
   }
 
   // ---------- схема для печати ----------
@@ -74,7 +84,7 @@
     x.textBaseline = 'alphabetic';
     const m = x.measureText(c.symbol);
     const dy = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-    x.fillStyle = c.dark ? '#ffffff' : '#000000';
+    x.fillStyle = c.faint ? '#c4c4c4' : c.dark ? '#ffffff' : '#000000';
     x.fillText(c.symbol, cx, cy + dy);
   }
 
@@ -95,9 +105,9 @@
     return cv;
   }
 
-  function renderScheme(res, cellPx, shape) {
+  function renderScheme(res, cellPx, shape, highlight) {
     const s = cellPx;
-    const cv = drawCells(res, s, res.colors.map(function (c) { return symbolSprite(c, s, shape); }));
+    const cv = drawCells(res, s, withHighlight(res.colors, highlight).map(function (c) { return symbolSprite(c, s, shape); }));
     const x = cv.getContext('2d'), W = cv.width, H = cv.height;
     if (s >= 6) {
       const big = s >= 16; // на мелком предпросмотре линии делаем легче, иначе они забивают картинку
@@ -109,8 +119,8 @@
       const bw = Math.max(1, Math.round(s * 0.08)), hw = bw + 2 * Math.max(1, Math.round(s * 0.035));
       (big ? [['#ffffff', hw], ['#000000', bw]] : [['#000000', bw]]).forEach(function (p) {
         x.fillStyle = p[0];
-        for (let i = 10; i < res.cols; i += 10) x.fillRect(i * s - p[1] / 2, 0, p[1], H);
-        for (let j = 10; j < res.rows; j += 10) x.fillRect(0, j * s - p[1] / 2, W, p[1]);
+        for (let i = 10; i < res.cols; i += 10) x.fillRect(Math.round(i * s - p[1] / 2), 0, p[1], H);
+        for (let j = 10; j < res.rows; j += 10) x.fillRect(0, Math.round(j * s - p[1] / 2), W, p[1]);
       });
       x.strokeStyle = '#000000';
       x.lineWidth = bw;
@@ -125,7 +135,7 @@
   }
 
   function fmt(n) {
-    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
   }
 
   function sizeLabel(meta) {
@@ -158,11 +168,11 @@
     x.textAlign = 'left';
     x.textBaseline = 'alphabetic';
     x.font = 'bold 22px ' + FONT;
-    x.fillText('Легенда для схемы размером ' + sizeLabel(meta) + '* (' + res.cols + '×' + res.rows + ' страз) из ' + n + ' цветов', pad, pad + 22);
+    x.fillText('Легенда для схемы размером ' + sizeLabel(meta) + '* (' + res.cols + '×' + res.rows + ' страз) из ' + n + ' цветов', pad, pad + 22, W - pad * 2);
     if (hasSub) {
       x.font = '16px ' + FONT;
       x.fillStyle = '#555555';
-      x.fillText([meta.article, meta.title ? '«' + meta.title + '»' : ''].filter(Boolean).join('  '), pad, pad + 50);
+      x.fillText([meta.article, meta.title ? '«' + meta.title + '»' : ''].filter(Boolean).join('  '), pad, pad + 50, W - pad * 2);
     }
 
     let total = 0, totalG = 0;
@@ -218,12 +228,20 @@
     return cv;
   }
 
+  /* Ячейка CSV: значения, которые Excel принял бы за формулу (= + - @), получают
+   * пробел в начале; поля с «;», кавычками и переводами строк берутся в кавычки. */
+  function csvCell(v) {
+    let s = String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = ' ' + s;
+    return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
   function legendCsv(res, meta) {
     const rows = ['Значок;Номер DMC;Число страз;Вес, г'];
     res.colors.forEach(function (c) {
-      rows.push([c.symbol, c.code, c.count, grams(c.count, meta.gramPerStone)].join(';'));
+      rows.push([c.symbol, c.code, c.count, grams(c.count, meta.gramPerStone)].map(csvCell).join(';'));
     });
-    return '﻿' + rows.join('\r\n') + '\r\n';
+    return '\ufeff' + rows.join('\r\n') + '\r\n';
   }
 
   // ---------- макет ----------
@@ -291,7 +309,7 @@
     if (meta.title) blocks.push(textBlock(['«' + meta.title + '»'], fs));
     const thumbH = mm(20);
     if (src) blocks.push({ type: 'thumb', w: (thumbH * res.cols) / res.rows });
-    if (meta.urls && meta.urls.length) blocks.push(textBlock(meta.urls, fs * 0.95));
+    if (meta.urls && meta.urls.length) blocks.push(textBlock(meta.urls.slice(0, 3), fs * 0.95)); // больше трёх строк в поле шапки не помещается
 
     const gapX = mm(7);
     let totalW = gapX * (blocks.length - 1);
@@ -329,7 +347,14 @@
     // легенда DMC у правого края
     const n = res.colors.length;
     const rowH = Math.min(mm(7.5), (H - mm(40)) / (n + 2));
-    const boxW = rowH * 2.9, boxH = rowH * (n + 1.7);
+    const codeFont = Math.max(5, Math.round(rowH * 0.5)) + 'px ' + FONT;
+    x.font = codeFont;
+    let codeW = 0;
+    res.colors.forEach(function (c) { codeW = Math.max(codeW, x.measureText(c.code).width); });
+    // ширина плашки — по самому длинному номеру, но не шире поля листа
+    const boxW = Math.min(M - mm(4), Math.max(rowH * 2.9, rowH * 1.27 + codeW + rowH * 0.45));
+    const codeMax = boxW - rowH * 1.27 - rowH * 0.25;
+    const boxH = rowH * (n + 1.7);
     const lx = W - boxW, ly = (H - boxH) / 2;
     x.fillStyle = '#ffffff';
     roundRect(x, lx, ly, boxW, boxH, rowH * 0.3);
@@ -352,8 +377,8 @@
       x.fillStyle = '#000000';
       x.textAlign = 'left';
       x.textBaseline = 'middle';
-      x.font = Math.max(5, Math.round(rowH * 0.5)) + 'px ' + FONT;
-      x.fillText(c.code, qx + sq + rowH * 0.3, y + rowH / 2);
+      x.font = codeFont;
+      x.fillText(c.code, qx + sq + rowH * 0.3, y + rowH / 2, codeMax);
     });
 
     // логотип / QR внизу по центру

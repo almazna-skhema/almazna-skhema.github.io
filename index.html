@@ -3,49 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; base-uri 'none'; form-action 'none'">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
   <title>Алмазная схема</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bea'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
   <aside class="panel">
     <header class="brand">
-      <h1>Алмазная схема</h1>
-      <p>Картинка → схема алмазной мозаики по палитре DMC</p>
+      <div class="brand-mark" aria-hidden="true">◆</div>
+      <div>
+        <h1>Алмазная схема</h1>
+        <p>Картинка → схема мозаики по номерам DMC</p>
+      </div>
     </header>
 
-    <section>
+    <section class="step">
       <h2><span>1</span>Картинка</h2>
-      <label class="drop" id="drop">
-        <input type="file" id="file" accept="image/*" hidden>
-        <span class="drop-thumb" id="dropThumb"></span>
+      <input type="file" id="file" class="vh" accept="image/*" tabindex="-1" aria-hidden="true">
+      <button type="button" class="drop" id="drop">
+        <span class="drop-thumb" id="dropThumb" aria-hidden="true">＋</span>
         <span class="drop-text">
           <b id="dropTitle">Выбрать картинку</b>
-          <small id="dropHint">или перетащите файл сюда</small>
+          <small id="dropHint">или перетащите файл, или вставьте из буфера (Ctrl+V)</small>
         </span>
-      </label>
-      <div class="field" id="cropFields" hidden>
-        <label>Сдвиг кадра по горизонтали <input type="range" id="focusX" min="0" max="100" value="50" data-kind="full"></label>
-        <label>Сдвиг кадра по вертикали <input type="range" id="focusY" min="0" max="100" value="50" data-kind="full"></label>
+      </button>
+      <div class="crop" id="cropBox" hidden>
+        <canvas id="cropCanvas" aria-label="Выбор части картинки для холста"></canvas>
+        <p class="hint">Картинка шире или выше холста. Потяните светлую рамку, чтобы выбрать, какая часть попадёт в схему.</p>
       </div>
     </section>
 
-    <section>
+    <section class="step">
       <h2><span>2</span>Холст</h2>
-      <div class="row">
-        <label class="grow">Размер
-          <select id="sizePreset">
-            <option value="20x20">20 × 20 см</option>
-            <option value="20x30">20 × 30 см</option>
-            <option value="30x30">30 × 30 см</option>
-            <option value="30x40">30 × 40 см</option>
-            <option value="40x50" selected>40 × 50 см</option>
-            <option value="40x60">40 × 60 см</option>
-            <option value="50x70">50 × 70 см</option>
-            <option value="60x80">60 × 80 см</option>
-            <option value="custom">Свой размер</option>
-          </select>
-        </label>
-      </div>
+      <label>Размер
+        <select id="sizePreset">
+          <option value="20x20">20 × 20 см</option>
+          <option value="20x30">20 × 30 см</option>
+          <option value="30x30">30 × 30 см</option>
+          <option value="30x40">30 × 40 см</option>
+          <option value="40x50" selected>40 × 50 см</option>
+          <option value="40x60">40 × 60 см</option>
+          <option value="50x70">50 × 70 см</option>
+          <option value="60x80">60 × 80 см</option>
+          <option value="custom">Свой размер</option>
+        </select>
+      </label>
       <div class="row">
         <label>Ширина, см <input type="number" id="wCm" min="5" max="120" step="1" value="40" data-kind="full"></label>
         <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст">⇄</button>
@@ -58,17 +63,16 @@
       <p class="stats" id="stats">160 × 200 страз</p>
     </section>
 
-    <section>
+    <section class="step">
       <h2><span>3</span>Цвета</h2>
-      <div class="palette">
-        <div class="palette-info">
+      <div class="card">
+        <div class="card-info">
           <b id="palName">Открытая таблица DMC</b>
           <small id="palHint">454 цвета ниток — оттенки страз могут отличаться</small>
         </div>
-        <div class="palette-actions">
-          <label class="filebtn">Загрузить свою таблицу
-            <input type="file" id="palFile" accept=".csv,.txt,text/csv,text/plain" hidden>
-          </label>
+        <div class="card-actions">
+          <input type="file" id="palFile" class="vh" accept=".csv,.txt,text/csv,text/plain" tabindex="-1" aria-hidden="true">
+          <button type="button" id="palPick">Загрузить свою таблицу</button>
           <button type="button" class="link" id="palSample">Скачать образец</button>
           <button type="button" class="link" id="palReset" hidden>Вернуть стандартную</button>
         </div>
@@ -83,48 +87,57 @@
           <option value="2">Убрать сильнее</option>
         </select>
       </label>
-      <label>Сглаживание <output id="smoothOut">20</output>
-        <input type="range" id="smooth" min="0" max="100" value="20" data-kind="full">
-      </label>
-      <label>Плавные переходы (точечное смешение) <output id="ditherOut">0</output>
-        <input type="range" id="dither" min="0" max="100" value="0" step="5" data-kind="full">
-      </label>
+      <p class="hint">Одиночные стразы другого цвета неудобно выкладывать. Яркие акценты — звёзды, огоньки — остаются.</p>
       <details>
-        <summary>Коррекция картинки</summary>
+        <summary>Тонкая настройка</summary>
+        <label>Сглаживание <output id="smoothOut">20</output>
+          <input type="range" id="smooth" min="0" max="100" value="20" data-kind="full"></label>
+        <p class="hint">Убирает рябь в однородных зонах: небо, фон, кожа.</p>
+        <label>Плавные переходы <output id="ditherOut">0</output>
+          <input type="range" id="dither" min="0" max="100" value="0" step="5" data-kind="full"></label>
+        <p class="hint">Смешивает соседние цвета точками. Переходы мягче, но одиночных страз больше.</p>
         <label>Яркость <output id="brightnessOut">0</output>
           <input type="range" id="brightness" min="-50" max="50" value="0" data-kind="full"></label>
         <label>Контраст <output id="contrastOut">0</output>
           <input type="range" id="contrast" min="-50" max="50" value="0" data-kind="full"></label>
         <label>Насыщенность <output id="saturationOut">0</output>
           <input type="range" id="saturation" min="-100" max="100" value="0" data-kind="full"></label>
-        <button type="button" class="link" id="resetAdjust">Сбросить коррекцию</button>
+        <button type="button" class="link" id="resetAdjust">Сбросить тонкую настройку</button>
       </details>
     </section>
 
-    <section>
-      <h2><span>4</span>Макет</h2>
-      <div class="row">
-        <label class="grow">Артикул <input type="text" id="article" placeholder="AS 45462" data-kind="meta"></label>
+    <section class="step">
+      <h2><span>4</span>Макет для печати <em>необязательно</em></h2>
+      <label>Артикул <input type="text" id="article" maxlength="40" placeholder="AS 45462" data-kind="meta"></label>
+      <label>Название <input type="text" id="title" maxlength="80" placeholder="Зимові будиночки" data-kind="meta"></label>
+      <label>Адреса сайта (до трёх строк)
+        <textarea id="urls" rows="2" maxlength="300" placeholder="www.example.com" data-kind="meta"></textarea>
+      </label>
+      <div class="card">
+        <div class="card-info">
+          <b id="logoName">Логотип и QR-коды</b>
+          <small id="logoHint">Одна картинка PNG — встанет внизу макета</small>
+        </div>
+        <div class="card-actions">
+          <input type="file" id="logoFile" class="vh" accept="image/*" tabindex="-1" aria-hidden="true">
+          <button type="button" id="logoPick">Выбрать картинку</button>
+          <button type="button" class="link" id="logoReset" hidden>Убрать</button>
+        </div>
       </div>
-      <label>Название <input type="text" id="title" placeholder="Зимові будиночки" data-kind="meta"></label>
-      <label>Адреса сайта (по одному в строке)
-        <textarea id="urls" rows="2" placeholder="www.example.com" data-kind="meta"></textarea>
-      </label>
-      <label>Логотип и QR-коды (одна картинка, PNG)
-        <input type="file" id="logoFile" accept="image/*">
-      </label>
-      <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" data-kind="meta"></label>
+      <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" maxlength="8" data-kind="meta"></label>
     </section>
 
     <footer class="actions">
       <button type="button" class="primary" id="zip" disabled>Скачать комплект (ZIP)</button>
-      <p class="status" id="status" role="status">Загрузите картинку, чтобы начать</p>
+      <p class="status" id="status" role="status" aria-live="polite">Загрузите картинку, чтобы начать</p>
+      <p class="foot"><button type="button" class="link" id="resetAll">Сбросить настройки</button><span id="version"></span></p>
     </footer>
   </aside>
 
   <main>
-    <nav class="tabs">
-      <div class="tablist" role="tablist">
+    <nav class="toolbar">
+      <div class="tablist" role="tablist" aria-label="Что показать">
+        <button role="tab" data-tab="original" aria-selected="false">Оригинал</button>
         <button role="tab" data-tab="mosaic" aria-selected="true">Мозаика</button>
         <button role="tab" data-tab="scheme" aria-selected="false">Схема</button>
         <button role="tab" data-tab="legend" aria-selected="false">Легенда</button>
@@ -132,25 +145,40 @@
       </div>
       <div class="tools">
         <button type="button" class="icon" id="zoomOut" title="Уменьшить" aria-label="Уменьшить">−</button>
-        <button type="button" class="ghost" id="zoomFit">Вписать</button>
+        <span class="zoom-label" id="zoomLabel">100%</span>
         <button type="button" class="icon" id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
-        <button type="button" class="ghost" id="saveOne" disabled>Скачать этот файл</button>
+        <button type="button" id="zoomFit">Вписать</button>
+        <button type="button" id="saveOne" disabled>Скачать этот файл</button>
       </div>
     </nav>
     <div class="stage" id="stage">
       <div class="empty" id="empty">
-        <h3>Здесь появится схема</h3>
-        <p>Выберите картинку слева. Сервис разложит её на стразы, подберёт цвета DMC и соберёт комплект файлов: схему для печати, вид мозаики, легенду и макет.</p>
-        <p class="muted">Картинка обрабатывается прямо в браузере и никуда не отправляется.</p>
+        <h3>Перетащите сюда картинку</h3>
+        <p>Сервис разложит её на стразы, подберёт цвета по номерам DMC и соберёт комплект: макет, схему для печати, вид мозаики, легенду и расход страз.</p>
+        <button type="button" class="primary" id="emptyPick">Выбрать картинку</button>
+        <small>Подойдут JPG, PNG, WebP. Картинка обрабатывается в вашем браузере и никуда не отправляется.</small>
       </div>
       <div class="holder" id="holder" hidden></div>
     </div>
   </main>
 
-  <script src="js/palette-dmc.js"></script>
-  <script src="js/files.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/app.js"></script>
+  <aside class="colors" id="colorsPanel" hidden>
+    <h2>Цвета в схеме</h2>
+    <div class="summary">
+      <div><b id="sumColors">0</b><small>цветов</small></div>
+      <div><b id="sumStones">0</b><small>страз</small></div>
+      <div><b id="sumGrams">0</b><small>граммов</small></div>
+    </div>
+    <p class="hint">Нажмите на цвет, чтобы подсветить его на схеме. Крестик убирает цвет — сервис подберёт замену.</p>
+    <div class="color-head" aria-hidden="true"><span></span><span>Номер</span><span>Штук</span><span>Вес</span></div>
+    <ul id="colorList"></ul>
+    <div class="excluded" id="excludedBox" hidden></div>
+  </aside>
+
+  <script src="js/palette-dmc.js?v=4"></script>
+  <script src="js/files.js?v=4"></script>
+  <script src="js/engine.js?v=4"></script>
+  <script src="js/render.js?v=4"></script>
+  <script src="js/app.js?v=4"></script>
 </body>
 </html>

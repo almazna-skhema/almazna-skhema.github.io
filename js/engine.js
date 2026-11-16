@@ -6,6 +6,7 @@
    * отодвинуты в конец, чтобы не путались при выкладке. */
   const SYMBOLS = '123456789ACEHJKLMNPRSTUWXYZ+=#%&@?*<>$FVbdfghkmnrt'.split('');
   const MAX_COLORS = SYMBOLS.length;
+  const MAX_PALETTE = 3000; // больше цветов в таблице не бывает, а расчёт начинает тормозить
 
   // ---------- цвет: sRGB -> Oklab (расстояния в нём близки к восприятию глазом) ----------
   const LIN = new Float32Array(256);
@@ -39,39 +40,84 @@
     return { items: items, lab: lab };
   }
 
+  /* Делит строку таблицы на поля. Разделитель — тот, что есть в строке: «;», табуляция
+   * или «,»; кавычки вокруг поля учитываются. Без разделителя цвет ищется в конце строки:
+   * «157:8da7ca», «157 8da7ca», «DMC 310 #000000», «157 141 167 202». */
+  function splitRow(line) {
+    const delim = line.indexOf(';') >= 0 ? ';' : line.indexOf('\t') >= 0 ? '\t' : line.indexOf(',') >= 0 ? ',' : '';
+    if (!delim) {
+      let m = /^(.*?)[\s:]+(#?[0-9a-f]{6})$/i.exec(line);
+      if (m) return [m[1], m[2]];
+      m = /^(.*?)[\s:]+(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})$/.exec(line);
+      return m ? [m[1], m[2], m[3], m[4]] : [line];
+    }
+    const out = [];
+    let cur = '', quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (quoted && line[i + 1] === '"') { cur += '"'; i++; } else quoted = !quoted;
+      } else if (ch === delim && !quoted) { out.push(cur.trim()); cur = ''; } else cur += ch;
+    }
+    out.push(cur.trim());
+    return out;
+  }
+
+  function isByte(v) { return /^\d{1,3}$/.test(v) && +v <= 255; }
+
+  /* Цвет в строке: сначала #rrggbb, затем тройка R;G;B (последняя в строке — перед цветом
+   * часто стоят количество или остаток), затем шесть hex-знаков без решётки. */
+  function rowColor(f) {
+    let m;
+    for (let i = 1; i < f.length; i++) if ((m = /^#([0-9a-f]{6})$/i.exec(f[i]))) return parseInt(m[1], 16);
+    for (let i = f.length - 3; i >= 1; i--) {
+      if (isByte(f[i]) && isByte(f[i + 1]) && isByte(f[i + 2])) return (+f[i] << 16) | (+f[i + 1] << 8) | +f[i + 2];
+    }
+    for (let i = f.length - 1; i >= 1; i--) if (/^[0-9a-f]{6}$/i.test(f[i])) return parseInt(f[i], 16);
+    return null;
+  }
+
+  /* Палитра без исключённых номеров (если остаётся меньше двух цветов — исходная). */
+  function paletteWithout(pal, excluded) {
+    const items = pal.items.filter(function (it) { return !excluded.has(it.code); });
+    return items.length >= 2 ? paletteFromItems(items) : pal;
+  }
+
   /* Разбор своей таблицы цветов (CSV или текст). В каждой строке — номер и цвет:
    *   157;#8da7ca      157,8da7ca      157:8da7ca      157;141;167;202
-   * Лишние столбцы (название и т.п.) допускаются. Возвращает {items, skipped}. */
+   * Лишние столбцы (название и т.п.) допускаются; если в заголовке есть столбцы R, G, B —
+   * цвет берётся из них. Возвращает {items, skipped, tooMany}. */
   function parsePaletteText(text) {
     const byCode = new Map();
-    let skipped = 0;
-    String(text).replace(/^﻿/, '').split(/\r?\n/).forEach(function (line, lineNo) {
-      line = line.trim();
+    let skipped = 0, tooMany = false, rgbCols = null;
+    String(text).replace(/^\ufeff/, '').split(/\r\n|\r|\n/).forEach(function (line, lineNo) {
+      line = line.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').trim();
       if (!line) return;
-      let f = line.split(/[;,\t]/).map(function (s) { return s.trim().replace(/^"|"$/g, ''); });
-      if (f.length < 2) f = line.split(/[\s:]+/);
-      const code = f[0];
-      let rgb = null, m;
-      for (let i = 1; i < f.length && rgb === null; i++) {
-        if ((m = /^#([0-9a-f]{6})$/i.exec(f[i]))) rgb = parseInt(m[1], 16);
+      const f = splitRow(line);
+      if (lineNo === 0) {
+        const low = f.map(function (s) { return s.toLowerCase(); });
+        const r = low.findIndex(function (s) { return /^(r|red|красный)$/.test(s); });
+        const g = low.findIndex(function (s) { return /^(g|green|зел[её]ный)$/.test(s); });
+        const b = low.findIndex(function (s) { return /^(b|blue|синий)$/.test(s); });
+        if (r > 0 && g > 0 && b > 0) { rgbCols = [r, g, b]; return; }
       }
-      for (let i = 1; i + 2 < f.length && rgb === null; i++) {
-        const t = [f[i], f[i + 1], f[i + 2]];
-        if (t.every(function (v) { return /^\d{1,3}$/.test(v) && +v <= 255; })) rgb = (+t[0] << 16) | (+t[1] << 8) | +t[2];
+      const code = f[0].trim();
+      let rgb = null;
+      if (rgbCols && rgbCols.every(function (i) { return isByte(f[i] || ''); })) {
+        rgb = (+f[rgbCols[0]] << 16) | (+f[rgbCols[1]] << 8) | +f[rgbCols[2]];
       }
-      for (let i = 1; i < f.length && rgb === null; i++) {
-        if (/^[0-9a-f]{6}$/i.test(f[i])) rgb = parseInt(f[i], 16);
-      }
+      if (rgb === null) rgb = rowColor(f);
       if (!code || code.length > 16 || rgb === null) {
         if (lineNo > 0) skipped++; // первая строка обычно заголовок
         return;
       }
+      if (byCode.size >= MAX_PALETTE && !byCode.has(code)) { tooMany = true; return; }
       byCode.set(code, {
         code: code, r: rgb >> 16, g: (rgb >> 8) & 255, b: rgb & 255,
         hex: '#' + rgb.toString(16).padStart(6, '0')
       });
     });
-    return { items: Array.from(byCode.values()), skipped: skipped };
+    return { items: Array.from(byCode.values()), skipped: skipped, tooMany: tooMany };
   }
 
   // ---------- 1. картинка -> сетка ----------
@@ -100,6 +146,7 @@
       tc.imageSmoothingEnabled = true;
       tc.imageSmoothingQuality = 'high';
       tc.drawImage(cur, x, y, w, h, 0, 0, nw, nh);
+      if (cur !== src) cur.width = cur.height = 0; // промежуточный холст больше не нужен
       cur = t; x = 0; y = 0; w = nw; h = nh;
     }
     const out = makeCanvas(tw, th);
@@ -109,6 +156,7 @@
     oc.imageSmoothingEnabled = true;
     oc.imageSmoothingQuality = 'high';
     oc.drawImage(cur, x, y, w, h, 0, 0, tw, th);
+    if (cur !== src) cur.width = cur.height = 0;
     return out;
   }
 
@@ -360,9 +408,11 @@
 
   A.SYMBOLS = SYMBOLS;
   A.MAX_COLORS = MAX_COLORS;
+  A.MAX_PALETTE = MAX_PALETTE;
   A.parsePalette = parsePalette;
   A.paletteFromItems = paletteFromItems;
   A.parsePaletteText = parsePaletteText;
+  A.paletteWithout = paletteWithout;
   A.cropRect = cropRect;
   A.downscale = downscale;
   A.sampleGrid = sampleGrid;
