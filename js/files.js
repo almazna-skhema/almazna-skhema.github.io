@@ -221,6 +221,167 @@
     ]);
   }
 
+  /* Кодировщик JPEG в CMYK. Браузер сам такие файлы не пишет, а типография ждёт именно их.
+   * Обычный (baseline) JPEG с четырьмя каналами без прореживания; по соглашению Adobe значения
+   * красок хранятся перевёрнутыми. Картинка подаётся полосами по 8 строк RGBA, цвет переводится
+   * по таблице lut (сетка n³, 4 байта на узел, порядок: синий, красный, зелёный).
+   * Использование: const e = jpegCmyk(w, h, lut, quality, dpi); e.band(rgba, rows) …; parts = e.finish(). */
+  function jpegCmyk(width, height, lut, quality, dpi) {
+    const ZZ = [0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6, 7, 14, 21, 28,
+      35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63];
+    const QL = [16, 11, 10, 16, 24, 40, 51, 61, 12, 12, 14, 19, 26, 58, 60, 55, 14, 13, 16, 24, 40, 57, 69, 56, 14, 17, 22, 29, 51, 87, 80, 62,
+      18, 22, 37, 56, 68, 109, 103, 77, 24, 35, 55, 64, 81, 104, 113, 92, 49, 64, 78, 87, 103, 121, 120, 101, 72, 92, 95, 98, 112, 100, 103, 99];
+    const DC_BITS = [0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0], DC_VALS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const AC_BITS = [0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d];
+    const AC_VALS = [0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xa1, 0x08,
+      0x23, 0x42, 0xb1, 0xc1, 0x15, 0x52, 0xd1, 0xf0, 0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0a, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x25, 0x26, 0x27, 0x28,
+      0x29, 0x2a, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59,
+      0x5a, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89,
+      0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6,
+      0xb7, 0xb8, 0xb9, 0xba, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xe1, 0xe2,
+      0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa];
+    function huff(bits, vals) { // таблица: символ → [код, длина]
+      const codes = [], lens = [];
+      let code = 0, k = 0;
+      for (let len = 1; len <= 16; len++) {
+        for (let i = 0; i < bits[len - 1]; i++) { codes[vals[k]] = code++; lens[vals[k]] = len; k++; }
+        code <<= 1;
+      }
+      return { c: codes, l: lens };
+    }
+    const DC = huff(DC_BITS, DC_VALS), AC = huff(AC_BITS, AC_VALS);
+    const q = Math.max(1, Math.min(100, quality | 0)), scale = q < 50 ? 5000 / q : 200 - q * 2;
+    const QT = QL.map(function (v) { return Math.max(1, Math.min(255, Math.floor((v * scale + 50) / 100))); });
+    const AAN = [1.0, 1.387039845, 1.306562965, 1.175875602, 1.0, 0.785694958, 0.5411961, 0.275899379];
+    const FQ = new Float64Array(64); // делители для быстрого DCT с учётом квантования
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) FQ[r * 8 + c] = 1 / (QT[r * 8 + c] * AAN[r] * AAN[c] * 8);
+
+    // поток: байты пишем в куски по 1 МБ
+    const parts = [];
+    let buf = new Uint8Array(1 << 20), pos = 0, acc = 0, nbits = 0;
+    function byte(b) { if (pos === buf.length) { parts.push(buf); buf = new Uint8Array(1 << 20); pos = 0; } buf[pos++] = b; }
+    function put(code, len) {
+      acc = (acc << len) | code;
+      nbits += len;
+      while (nbits >= 8) {
+        const b = (acc >>> (nbits - 8)) & 255;
+        byte(b);
+        if (b === 255) byte(0);
+        nbits -= 8;
+      }
+      acc &= (1 << nbits) - 1;
+    }
+    function word(v) { byte(v >> 8); byte(v & 255); }
+    function marker(m, payload) { byte(0xff); byte(m); word(payload.length + 2); payload.forEach(byte); }
+
+    const d = Math.max(1, Math.min(65535, Math.round(dpi || 300)));
+    byte(0xff); byte(0xd8);
+    marker(0xe0, [0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 1, d >> 8, d & 255, d >> 8, d & 255, 0, 0]);
+    marker(0xee, [0x41, 0x64, 0x6f, 0x62, 0x65, 0, 100, 0, 0, 0, 0, 0]); // «Adobe», без преобразования цвета: это CMYK
+    marker(0xdb, [0].concat(ZZ.map(function (i) { return QT[i]; })));
+    marker(0xc0, [8, height >> 8, height & 255, width >> 8, width & 255, 4, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 4, 0x11, 0]);
+    marker(0xc4, [0x00].concat(DC_BITS, DC_VALS));
+    marker(0xc4, [0x10].concat(AC_BITS, AC_VALS));
+    marker(0xda, [4, 1, 0, 2, 0, 3, 0, 4, 0, 0, 63, 0]);
+
+    const n = lut.n, T = lut.data, n1 = n - 1, bw = Math.ceil(width / 8);
+    const planes = [0, 1, 2, 3].map(function () { return new Uint8Array(bw * 8 * 8); });
+    const block = new Float64Array(64), pred = [0, 0, 0, 0];
+
+    function fdct(p) { // быстрое DCT (алгоритм AAN), на месте
+      for (let i = 0; i < 64; i += 8) {
+        const t0 = p[i] + p[i + 7], t7 = p[i] - p[i + 7], t1 = p[i + 1] + p[i + 6], t6 = p[i + 1] - p[i + 6];
+        const t2 = p[i + 2] + p[i + 5], t5 = p[i + 2] - p[i + 5], t3 = p[i + 3] + p[i + 4], t4 = p[i + 3] - p[i + 4];
+        let a = t0 + t3, b = t1 + t2, c = t1 - t2, e = t0 - t3;
+        p[i] = a + b; p[i + 4] = a - b;
+        let z = (c + e) * 0.707106781; p[i + 2] = e + z; p[i + 6] = e - z;
+        a = t4 + t5; b = t5 + t6; c = t6 + t7;
+        const z5 = (a - c) * 0.382683433, z2 = 0.5411961 * a + z5, z4 = 1.306562965 * c + z5, z3 = b * 0.707106781;
+        const z11 = t7 + z3, z13 = t7 - z3;
+        p[i + 5] = z13 + z2; p[i + 3] = z13 - z2; p[i + 1] = z11 + z4; p[i + 7] = z11 - z4;
+      }
+      for (let i = 0; i < 8; i++) {
+        const t0 = p[i] + p[i + 56], t7 = p[i] - p[i + 56], t1 = p[i + 8] + p[i + 48], t6 = p[i + 8] - p[i + 48];
+        const t2 = p[i + 16] + p[i + 40], t5 = p[i + 16] - p[i + 40], t3 = p[i + 24] + p[i + 32], t4 = p[i + 24] - p[i + 32];
+        let a = t0 + t3, b = t1 + t2, c = t1 - t2, e = t0 - t3;
+        p[i] = a + b; p[i + 32] = a - b;
+        let z = (c + e) * 0.707106781; p[i + 16] = e + z; p[i + 48] = e - z;
+        a = t4 + t5; b = t5 + t6; c = t6 + t7;
+        const z5 = (a - c) * 0.382683433, z2 = 0.5411961 * a + z5, z4 = 1.306562965 * c + z5, z3 = b * 0.707106781;
+        const z11 = t7 + z3, z13 = t7 - z3;
+        p[i + 40] = z13 + z2; p[i + 24] = z13 - z2; p[i + 8] = z11 + z4; p[i + 56] = z11 - z4;
+      }
+    }
+    const coef = new Int32Array(64);
+    function emit(comp) {
+      fdct(block);
+      for (let i = 0; i < 64; i++) { const v = block[ZZ[i]] * FQ[ZZ[i]]; coef[i] = v < 0 ? -((-v + 0.5) | 0) : (v + 0.5) | 0; }
+      let diff = coef[0] - pred[comp];
+      pred[comp] = coef[0];
+      let a = diff < 0 ? -diff : diff, size = 0;
+      while (a) { size++; a >>= 1; }
+      put(DC.c[size], DC.l[size]);
+      if (size) put(diff < 0 ? diff + (1 << size) - 1 : diff, size);
+      let run = 0;
+      for (let i = 1; i < 64; i++) {
+        const v = coef[i];
+        if (!v) { run++; continue; }
+        while (run > 15) { put(AC.c[0xf0], AC.l[0xf0]); run -= 16; }
+        a = v < 0 ? -v : v; size = 0;
+        while (a) { size++; a >>= 1; }
+        const sym = (run << 4) | size;
+        put(AC.c[sym], AC.l[sym]);
+        put(v < 0 ? v + (1 << size) - 1 : v, size);
+        run = 0;
+      }
+      if (run) put(AC.c[0], AC.l[0]);
+    }
+
+    /* Полоса из rows строк (8, кроме последней): rgba — её точки подряд. */
+    function band(rgba, rows) {
+      const W8 = bw * 8;
+      let pr = -1, pg = -1, pb = -1, c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+      for (let y = 0; y < 8; y++) {
+        const sy = y < rows ? y : rows - 1; // недостающие строки повторяют последнюю
+        for (let x = 0; x < W8; x++) {
+          const o = (sy * width + (x < width ? x : width - 1)) * 4, r = rgba[o], g = rgba[o + 1], b = rgba[o + 2];
+          if (r !== pr || g !== pg || b !== pb) {
+            pr = r; pg = g; pb = b;
+            const fr = (r * n1) / 255, fg = (g * n1) / 255, fb = (b * n1) / 255;
+            const r0 = fr | 0, g0 = fg | 0, b0 = fb | 0, r1 = r0 < n1 ? r0 + 1 : r0, g1 = g0 < n1 ? g0 + 1 : g0, b1 = b0 < n1 ? b0 + 1 : b0;
+            const dr = fr - r0, dg = fg - g0, db = fb - b0;
+            const i000 = ((b0 * n + r0) * n + g0) * 4, i001 = ((b0 * n + r0) * n + g1) * 4, i010 = ((b0 * n + r1) * n + g0) * 4, i011 = ((b0 * n + r1) * n + g1) * 4;
+            const i100 = ((b1 * n + r0) * n + g0) * 4, i101 = ((b1 * n + r0) * n + g1) * 4, i110 = ((b1 * n + r1) * n + g0) * 4, i111 = ((b1 * n + r1) * n + g1) * 4;
+            const w000 = (1 - db) * (1 - dr) * (1 - dg), w001 = (1 - db) * (1 - dr) * dg, w010 = (1 - db) * dr * (1 - dg), w011 = (1 - db) * dr * dg;
+            const w100 = db * (1 - dr) * (1 - dg), w101 = db * (1 - dr) * dg, w110 = db * dr * (1 - dg), w111 = db * dr * dg;
+            c0 = T[i000] * w000 + T[i001] * w001 + T[i010] * w010 + T[i011] * w011 + T[i100] * w100 + T[i101] * w101 + T[i110] * w110 + T[i111] * w111;
+            c1 = T[i000 + 1] * w000 + T[i001 + 1] * w001 + T[i010 + 1] * w010 + T[i011 + 1] * w011 + T[i100 + 1] * w100 + T[i101 + 1] * w101 + T[i110 + 1] * w110 + T[i111 + 1] * w111;
+            c2 = T[i000 + 2] * w000 + T[i001 + 2] * w001 + T[i010 + 2] * w010 + T[i011 + 2] * w011 + T[i100 + 2] * w100 + T[i101 + 2] * w101 + T[i110 + 2] * w110 + T[i111 + 2] * w111;
+            c3 = T[i000 + 3] * w000 + T[i001 + 3] * w001 + T[i010 + 3] * w010 + T[i011 + 3] * w011 + T[i100 + 3] * w100 + T[i101 + 3] * w101 + T[i110 + 3] * w110 + T[i111 + 3] * w111;
+          }
+          const k = y * W8 + x;
+          planes[0][k] = 255 - c0; planes[1][k] = 255 - c1; planes[2][k] = 255 - c2; planes[3][k] = 255 - c3; // перевёрнуто, как пишет Adobe
+        }
+      }
+      for (let bx = 0; bx < bw; bx++) {
+        for (let comp = 0; comp < 4; comp++) {
+          const pl = planes[comp];
+          for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) block[y * 8 + x] = pl[y * W8 + bx * 8 + x] - 128;
+          emit(comp);
+        }
+      }
+    }
+
+    function finish() {
+      if (nbits) put((1 << (8 - nbits)) - 1, 8 - nbits);
+      byte(0xff); byte(0xd9);
+      parts.push(buf.subarray(0, pos));
+      return parts;
+    }
+    return { band: band, finish: finish };
+  }
+
+  A.jpegCmyk = jpegCmyk;
   A.labelsDocx = labelsDocx;
   A.jpegSetDpi = jpegSetDpi;
   A.pdfFromJpeg = pdfFromJpeg;

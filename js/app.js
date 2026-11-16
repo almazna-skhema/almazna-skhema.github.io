@@ -4,7 +4,8 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 19 · 16.11.2026';
+  const ASSET_VERSION = 20; // тот же номер, что в адресах скриптов в index.html
+  const VERSION = T('версия') + ' 20 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -1131,9 +1132,53 @@
     });
   }
 
-  /* JPEG для типографии: тот же макет одним файлом, с записанным разрешением печати. */
-  function canvasJpeg(cv, pxPerMm) {
-    return canvasJpegBytes(cv).then(function (jpg) { return A.jpegSetDpi(jpg, pxPerMm * 25.4); });
+  /* Таблица перевода цвета в CMYK большая, поэтому подгружается только когда нужна. */
+  let cmykLut = null;
+  function loadCmykLut() {
+    if (cmykLut) return cmykLut;
+    cmykLut = new Promise(function (resolve, reject) {
+      const sc = document.createElement('script');
+      sc.src = 'js/cmyk-lut.js?v=' + ASSET_VERSION;
+      sc.onload = function () {
+        try {
+          const bin = atob(A.CMYK_LUT.base64), data = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+          resolve({ n: A.CMYK_LUT.n, data: data });
+        } catch (e) { reject(e); }
+      };
+      sc.onerror = function () { cmykLut = null; reject(new Error('cmyk')); };
+      document.head.appendChild(sc);
+    });
+    return cmykLut;
+  }
+
+  /* JPEG для типографии — в том виде, в каком его делают сейчас: CMYK (мелованная бумага,
+   * FOGRA39) и ровно 300 dpi. Макет пересчитывается с рабочего разрешения в 300 dpi и кодируется
+   * полосами по 8 строк, чтобы страница не замирала. Не вышло — отдаём обычный JPEG в RGB. */
+  async function canvasJpeg(cv, pxPerMm) {
+    let small = null;
+    try {
+      const lut = await loadCmykLut();
+      const k = (300 / 25.4) / pxPerMm;
+      const w = Math.max(8, Math.round(cv.width * k)), h = Math.max(8, Math.round(cv.height * k));
+      small = A.makeCanvas(w, h);
+      const x = small.getContext('2d', { willReadFrequently: true });
+      x.imageSmoothingEnabled = true;
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(cv, 0, 0, w, h);
+      const enc = A.jpegCmyk(w, h, lut, 80, 300);
+      for (let y = 0, n = 0; y < h; y += 8, n++) {
+        const rows = Math.min(8, h - y);
+        enc.band(x.getImageData(0, y, w, rows).data, rows);
+        if (n % 24 === 23) await wait(0);
+      }
+      return joinBytes(enc.finish());
+    } catch (e) {
+      console.error(e);
+      return canvasJpegBytes(cv).then(function (jpg) { return A.jpegSetDpi(jpg, pxPerMm * 25.4); });
+    } finally {
+      release(small);
+    }
   }
 
   function exportKinds() {
