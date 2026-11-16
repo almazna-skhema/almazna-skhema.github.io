@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 11 · 16.11.2026';
+  const VERSION = T('версия') + ' 12 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -22,10 +22,10 @@
     print: new Map(),                              // номер цвета → цвет клетки на схеме (#rrggbb)
     brush: { on: false, code: null, size: 1, tool: 'brush', under: false }
   };
-  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels'];
+  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels', 'reserve'];
   // что входит в проект (настройки одной картинки)
-  const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight'];
-  const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057', minCount: 0, lines: '0', autoLight: '0' };
+  const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight', 'reserve'];
+  const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057', minCount: 0, lines: '0', autoLight: '0', reserve: 0 };
   const FILE_NAMES = { mosaic: T('Вид мозаики.png'), scheme: T('Схема для печати.png'), legend: T('Легенда.png'), layout: T('Макет.png'), insert: T('Вкладыш в набор.png') };
   const MAX_CM = 200; // самый большой холст по одной стороне
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
@@ -54,6 +54,16 @@
     if (e.type === 'checkbox') e.checked = String(v) === '1'; else e.value = v;
   }
 
+  function icon(name) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg'), use = document.createElementNS(NS, 'use');
+    svg.setAttribute('class', 'ic');
+    svg.setAttribute('aria-hidden', 'true');
+    use.setAttribute('href', '#i-' + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
   function setStatus(text, kind) {
     const s = $('status');
     s.textContent = text;
@@ -66,6 +76,8 @@
     const g = parseFloat(String($('gram').value).replace(',', '.'));
     return g > 0 && g < 1 ? g : 0.0057;
   }
+
+  function readReserve() { return clamp(parseInt($('reserve').value, 10) || 0, 0, 50); }
 
   function params() {
     const shape = document.querySelector('input[name=shape]:checked').value;
@@ -90,7 +102,9 @@
       article: $('article').value.trim(),
       title: $('title').value.trim(),
       urls: $('urls').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3),
-      gramPerStone: readGram(),
+      gramPerStone: readGram() * (1 + readReserve() / 100), // вес считаем сразу с запасом
+      gramBase: readGram(),
+      reserve: readReserve(),
       logos: state.logos.map(function (l) { return l.img; })
     };
   }
@@ -103,6 +117,7 @@
     });
     $('gram').value = String(readGram()).replace('.', ',');
     $('minCount').value = String(clamp(parseInt($('minCount').value, 10) || 0, 0, 9999));
+    $('reserve').value = String(readReserve());
   }
 
   function saveSettings() {
@@ -537,12 +552,14 @@
       row.appendChild(el('span', '', fmt(c.count)));
       row.appendChild(el('span', 'muted', g + T(' г')));
       row.addEventListener('click', function () { if (state.brush.on) setBrushCode(c.code); else toggleHighlight(c.code); });
-      const ed = el('button', 'color-x color-edit' + (c.from.length ? ' changed' : ''), '✎');
+      const ed = el('button', 'color-x color-edit' + (c.from.length ? ' changed' : ''));
+      ed.appendChild(icon('pencil'));
       ed.type = 'button';
       ed.title = T('Заменить цвет ') + c.code + T(' на другой номер') + (c.from.length ? T(' (сейчас стоит вместо ') + c.from.join(', ') + ')' : '');
       ed.setAttribute('aria-label', ed.title);
       ed.addEventListener('click', function () { openPicker(c.code); });
-      const x = el('button', 'color-x', '×');
+      const x = el('button', 'color-x');
+      x.appendChild(icon('x'));
       x.type = 'button';
       x.title = T('Убрать цвет ') + c.code + T(' из схемы');
       x.setAttribute('aria-label', x.title);
@@ -1635,7 +1652,73 @@
       jobs.push(imageBlob().then(function (blob) { return dbPut('image', { blob: blob, name: name, id: id }); }));
     }
     jobs.push(dbPut('state', projectData()));
+    jobs.push(saveRecent());
     return Promise.all(jobs).catch(function () { /* хранилище недоступно — остаётся файл проекта */ });
+  }
+
+  // ---------- недавние работы ----------
+  const RECENT_MAX = 8;
+
+  function dbDel(key) {
+    return db().then(function (d) {
+      return new Promise(function (resolve) {
+        const tx = d.transaction('kv', 'readwrite');
+        tx.objectStore('kv').delete(key);
+        tx.oncomplete = tx.onerror = tx.onabort = function () { resolve(); };
+      });
+    });
+  }
+
+  /* Каждая работа хранится целиком (картинка + правки), в списке — имя и миниатюра.
+   * Самые старые сверх лимита удаляются, чтобы не занимать место в браузере. */
+  function saveRecent() {
+    if (!state.img || !state.raw || !state.thumb) return Promise.resolve();
+    const id = state.imgId, data = projectData(), name = state.imgName;
+    const small = A.downscale(state.thumb, { x: 0, y: 0, w: state.thumb.width, h: state.thumb.height },
+      Math.max(1, Math.round(state.thumb.width * 0.25)), Math.max(1, Math.round(state.thumb.height * 0.25)));
+    const thumb = small.toDataURL('image/jpeg', 0.7);
+    release(small);
+    return dbGet('recent').then(function (list) {
+      list = (Array.isArray(list) ? list : []).filter(function (r) { return r && r.id !== id; });
+      const known = recentIds.has(id);
+      list.unshift({ id: id, name: name, time: Date.now(), thumb: thumb });
+      const drop = list.slice(RECENT_MAX);
+      list = list.slice(0, RECENT_MAX);
+      const jobs = [dbPut('recent', list), dbPut('work:' + id, data)];
+      if (!known) jobs.push(imageBlob().then(function (blob) { return dbPut('img:' + id, blob); }));
+      drop.forEach(function (r) { jobs.push(dbDel('work:' + r.id), dbDel('img:' + r.id)); recentIds.delete(r.id); });
+      recentIds.add(id);
+      return Promise.all(jobs).then(function () { showRecent(list); });
+    });
+  }
+  const recentIds = new Set();
+
+  function showRecent(list) {
+    const box = $('recentBox'), el2 = $('recentList');
+    el2.textContent = '';
+    list = Array.isArray(list) ? list : [];
+    box.hidden = list.length === 0;
+    list.forEach(function (r) {
+      if (!r || typeof r.id !== 'string') return;
+      recentIds.add(r.id);
+      const b = el('button', 'recent-item');
+      b.type = 'button';
+      b.title = T('Открыть: ') + String(r.name || '');
+      if (typeof r.thumb === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.thumb)) b.style.backgroundImage = 'url("' + r.thumb + '")';
+      b.appendChild(el('span', '', String(r.name || '').replace(/\.[^.]+$/, '')));
+      b.addEventListener('click', function () { openRecent(r.id); });
+      el2.appendChild(b);
+    });
+  }
+
+  function openRecent(id) {
+    if (state.busy) return;
+    Promise.all([dbGet('work:' + id), dbGet('img:' + id)]).then(function (got) {
+      const st = got[0], blob = got[1];
+      if (!st || !(blob instanceof Blob)) throw new Error('нет работы');
+      applyProjectData(st);
+      return loadImage(URL.createObjectURL(blob), st.name, true, { keep: true, blob: blob, id: id });
+    }).catch(function () { setStatus(T('Не удалось открыть эту работу: её нет в памяти браузера.'), 'error'); });
   }
 
   function restoreWork() {
@@ -1945,13 +2028,11 @@
   function applyUi() {
     const showColors = !!state.res && ui.colors;
     document.body.classList.toggle('hide-panel', !ui.panel);
-    document.body.classList.toggle('no-hints', !ui.hints);
     document.body.classList.toggle('with-colors', showColors);
     $('colorsPanel').hidden = !showColors;
     $('panelToggle').setAttribute('aria-pressed', ui.panel ? 'true' : 'false');
     $('colorsToggle').setAttribute('aria-pressed', showColors ? 'true' : 'false');
     $('colorsToggle').disabled = !state.res;
-    $('hintsToggle').textContent = ui.hints ? T('Скрыть подсказки') : T('Показать подсказки');
     applyZoom(); // область просмотра изменила размер
   }
 
@@ -1991,9 +2072,77 @@
     if (state.tab !== want) { state.zoom = 1; selectTab(want); } else { updateBrushBar(); showTab(); }
   }
 
+  // ---------- подсказки по наведению ----------
+  /* Пояснения из разметки (.hint, .lead) превращаются в значок «!» рядом с названием:
+   * экран остаётся чистым, а текст появляется при наведении, нажатии или с клавиатуры. */
+  function setupHints() {
+    const tip = $('tip');
+    let shown = null;
+    function hide() {
+      if (shown) shown.setAttribute('aria-expanded', 'false');
+      shown = null;
+      tip.hidden = true;
+    }
+    function show(btn) {
+      if (shown === btn) return;
+      hide();
+      shown = btn;
+      btn.setAttribute('aria-expanded', 'true');
+      tip.textContent = btn.dataset.tip;
+      tip.hidden = false;
+      const r = btn.getBoundingClientRect(), w = tip.offsetWidth, hgt = tip.offsetHeight;
+      let left = clamp(r.left + r.width / 2 - w / 2, 8, window.innerWidth - w - 8);
+      let top = r.bottom + 8;
+      if (top + hgt > window.innerHeight - 8) top = Math.max(8, r.top - hgt - 8);
+      tip.style.left = Math.round(left) + 'px';
+      tip.style.top = Math.round(top) + 'px';
+    }
+    function make(text) {
+      const b = el('button', 'info', '!');
+      b.type = 'button';
+      b.dataset.tip = text;
+      b.setAttribute('aria-label', text);
+      b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('mouseenter', function () { show(b); });
+      b.addEventListener('mouseleave', hide);
+      b.addEventListener('focus', function () { show(b); });
+      b.addEventListener('blur', hide);
+      b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); if (shown === b && e.detail === 0) hide(); else show(b); });
+      return b;
+    }
+    document.querySelectorAll('.hint:not(.keep), .lead').forEach(function (p) {
+      if (p.id) return; // динамические сообщения остаются текстом
+      const text = p.textContent.trim();
+      if (!text) return;
+      const btn = make(text);
+      let target = p.previousElementSibling;
+      while (target && target.classList.contains('info-row')) target = target.previousElementSibling;
+      const scope = p.parentElement;
+      if (target && target.tagName === 'LABEL' && !target.classList.contains('check')) {
+        // название поля — первый текстовый узел подписи: ставим значок сразу за ним
+        const node = Array.prototype.find.call(target.childNodes, function (n) { return n.nodeType === 3 && n.nodeValue.trim(); });
+        if (node) {
+          const wrap = el('span', 'with-info');
+          wrap.appendChild(document.createTextNode(node.nodeValue.trim()));
+          wrap.appendChild(btn);
+          target.replaceChild(wrap, node);
+        } else target.appendChild(btn);
+      } else if (target && (target.tagName === 'LABEL' || /^H[23]$/.test(target.tagName))) target.appendChild(btn);
+      else {
+        const head = scope.classList.contains('brushbar') ? null : scope.querySelector('h2, h3');
+        if (head && !head.querySelector('.info')) head.appendChild(btn); else { p.parentElement.insertBefore(btn, p); }
+      }
+      p.remove();
+    });
+    window.addEventListener('scroll', hide, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+    document.addEventListener('click', function (e) { if (shown && !e.target.closest('.info')) hide(); });
+  }
+
   // ---------- события ----------
   function init() {
     A.translateDom(document.body);
+    setupHints();
     document.querySelectorAll('[data-lang]').forEach(function (b) {
       b.setAttribute('aria-pressed', b.dataset.lang === A.lang ? 'true' : 'false');
       b.addEventListener('click', function () {
@@ -2015,6 +2164,7 @@
     restoreLogos();
     showStockNote();
     restoreWork();
+    dbGet('recent').then(showRecent, function () {});
     $('nColors').addEventListener('input', function () { wantColors = +$('nColors').value; });
     normalizeInputs();
     syncOutputs();
@@ -2179,7 +2329,6 @@
     $('panelToggle').addEventListener('click', function () { setPanels({ panel: !ui.panel }); });
     $('colorsToggle').addEventListener('click', function () { setPanels({ colors: !ui.colors }); });
     $('colorsClose').addEventListener('click', function () { setPanels({ colors: false }); });
-    $('hintsToggle').addEventListener('click', function () { setPanels({ hints: !ui.hints }); });
 
     // подготовка картинки, чистый холст, зоны без страз
     $('rotL').addEventListener('click', function () { transformImage({ rot: -90 }); });

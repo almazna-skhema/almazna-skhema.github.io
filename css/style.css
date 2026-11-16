@@ -1,17 +1,17 @@
 :root {
-  --bg: #eef0f4;
+  --bg: #f4f5f7;
   --panel: #ffffff;
-  --ink: #161a22;
-  --muted: #667085;
-  --line: #dde1e8;
+  --ink: #1f2328;
+  --muted: #6b7480;
+  --line: #e3e6eb;
   --field: #f5f6f8;
-  --accent: #2f5bea;
+  --accent: #4a67d6;
   --accent-ink: #ffffff;
-  --accent-soft: #e8edff;
-  --stage: #dde1e9;
-  --danger: #c0362c;
-  --ok: #1f8a4c;
-  --shadow: 0 6px 28px rgba(20, 30, 60, 0.2);
+  --accent-soft: #eaeefb;
+  --stage: #eceef2;
+  --danger: #c2413a;
+  --ok: #2c8a57;
+  --shadow: 0 4px 22px rgba(25, 35, 60, 0.14);
   --radius: 10px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 14px;
@@ -21,19 +21,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14171d;
-    --panel: #1c2028;
-    --ink: #eceff4;
-    --muted: #98a2b3;
-    --line: #2e343f;
-    --field: #252a34;
-    --accent: #6d8dff;
-    --accent-ink: #0d1220;
-    --accent-soft: #263156;
-    --stage: #0f1216;
-    --danger: #ff7b6e;
-    --ok: #5fd08d;
-    --shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+    --bg: #15171c;
+    --panel: #1b1e24;
+    --ink: #e6e8ec;
+    --muted: #8f98a5;
+    --line: #2a2f38;
+    --field: #22262e;
+    --accent: #8499f2;
+    --accent-ink: #10131f;
+    --accent-soft: #262d49;
+    --stage: #111318;
+    --danger: #f08379;
+    --ok: #63c98f;
+    --shadow: 0 4px 22px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -106,7 +106,31 @@ body.hide-panel .panel { display: none; }
 .how { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.4; }
 .how li { background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 button.wide { width: 100%; padding: 10px; font-weight: 600; }
-body.no-hints .hint:not(.keep) { display: none; }
+/* иконки: один набор, тонкая линия, цвет текста кнопки */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.sprite symbol { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ic { width: 18px; height: 18px; flex: none; display: block; pointer-events: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+button:has(> .ic) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.color-x .ic { width: 14px; height: 14px; }
+
+/* подсказка: «!» рядом с названием, текст появляется при наведении или нажатии */
+.info {
+  width: 17px; height: 17px; padding: 0; flex: none; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--field); color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1; cursor: help;
+  display: inline-grid; place-items: center; vertical-align: middle;
+}
+.info:hover, .info:focus-visible, .info[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.with-info { display: inline-flex; align-items: center; gap: 7px; }
+h2 > .info, h3 > .info, summary > .info { margin-left: 7px; }
+.tip {
+  position: fixed; z-index: 50; max-width: 280px; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; line-height: 1.45;
+  background: var(--ink); color: var(--panel); box-shadow: var(--shadow); pointer-events: none;
+}
+
+.recent h3 { margin: 4px 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.recent-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.recent-item { position: relative; padding: 0; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--field) center / cover no-repeat; }
+.recent-item span { position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 4px; font-size: 10px; background: rgba(0, 0, 0, 0.55); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); position: relative; }
 label output { position: absolute; right: 0; top: 0; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -238,7 +262,9 @@ button.zoom-label { min-width: 54px; height: 36px; padding: 0 6px; text-align: c
   grid-area: colors; height: 100vh; height: 100dvh; overflow-y: auto; background: var(--panel);
   border-left: 1px solid var(--line); padding: 16px 14px; display: flex; flex-direction: column; gap: 10px;
 }
-.colors h2 { margin: 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between; }
+.colors h2 { margin: 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; }
+.colors h2 .info { order: 1; }
+.colors h2 #colorsClose { order: 2; margin-left: auto; }
 .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .summary div { background: var(--field); border-radius: 8px; padding: 8px 6px; text-align: center; }
 .summary b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }

@@ -8,9 +8,25 @@
   <meta name="referrer" content="no-referrer">
   <title>Алмазная схема</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bea'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l4-1L19 8l-3-3L5 16l-1 4zM14 7l3 3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H10a6 6 0 0 0 0 12"/></symbol>
+    <symbol id="i-rot-l" viewBox="0 0 24 24"><path d="M4 5v5h5M5 10a8 8 0 1 1 2 7"/></symbol>
+    <symbol id="i-rot-r" viewBox="0 0 24 24"><path d="M20 5v5h-5M19 10a8 8 0 1 0-2 7"/></symbol>
+    <symbol id="i-flip-h" viewBox="0 0 24 24"><path d="M12 3v18M8 7l-5 5 5 5V7zM16 7l5 5-5 5V7z"/></symbol>
+    <symbol id="i-flip-v" viewBox="0 0 24 24"><path d="M3 12h18M7 8l5-5 5 5H7zM7 16l5 5 5-5H7z"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 12l4 4-4 4M21 16H7"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-.5-2 1-2h2a4 4 0 0 0 4-4c0-4.5-4-8-9-8z"/><path d="M7.5 12h.01M9.5 8h.01M14.5 7.5h.01"/></symbol>
+  </svg>
   <aside class="panel" id="panel">
     <header class="brand">
       <div class="brand-mark" aria-hidden="true">◆</div>
@@ -46,16 +62,20 @@
         </button>
         <div class="image-tools" id="imageTools" hidden>
           <div class="row tight">
-            <button type="button" class="icon" id="rotL" title="Повернуть влево" aria-label="Повернуть влево">↺</button>
-            <button type="button" class="icon" id="rotR" title="Повернуть вправо" aria-label="Повернуть вправо">↻</button>
-            <button type="button" class="icon" id="flipH" title="Отразить слева направо" aria-label="Отразить слева направо">⇆</button>
-            <button type="button" class="icon" id="flipV" title="Отразить сверху вниз" aria-label="Отразить сверху вниз">⇅</button>
+            <button type="button" class="icon" id="rotL" title="Повернуть влево" aria-label="Повернуть влево"><svg class="ic" aria-hidden="true"><use href="#i-rot-l"></use></svg></button>
+            <button type="button" class="icon" id="rotR" title="Повернуть вправо" aria-label="Повернуть вправо"><svg class="ic" aria-hidden="true"><use href="#i-rot-r"></use></svg></button>
+            <button type="button" class="icon" id="flipH" title="Отразить слева направо" aria-label="Отразить слева направо"><svg class="ic" aria-hidden="true"><use href="#i-flip-h"></use></svg></button>
+            <button type="button" class="icon" id="flipV" title="Отразить сверху вниз" aria-label="Отразить сверху вниз"><svg class="ic" aria-hidden="true"><use href="#i-flip-v"></use></svg></button>
             <select id="tone" aria-label="Тон картинки">
               <option value="color">Цветная</option>
               <option value="bw">Чёрно-белая</option>
               <option value="sepia">Сепия</option>
             </select>
           </div>
+        </div>
+        <div class="recent" id="recentBox" hidden>
+          <h3>Недавние работы</h3>
+          <div class="recent-list" id="recentList"></div>
         </div>
         <button type="button" class="link" id="blankStart" title="Схема без картинки: рисуете кистью по пустому холсту">Начать с чистого холста</button>
         <button type="button" class="link" id="projOpen" title="Открыть файл проекта и продолжить с того же места">Открыть сохранённый проект</button>
@@ -80,7 +100,7 @@
         </label>
         <div class="row">
           <label>Ширина, см <input type="number" id="wCm" min="5" max="200" step="1" value="40" data-kind="full"></label>
-          <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст">⇄</button>
+          <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст"><svg class="ic" aria-hidden="true"><use href="#i-swap"></use></svg></button>
           <label>Высота, см <input type="number" id="hCm" min="5" max="200" step="1" value="50" data-kind="full"></label>
         </div>
         <div class="seg" role="radiogroup" aria-label="Тип страз">
@@ -90,7 +110,7 @@
         <p class="stats" id="stats">160 × 200 страз</p>
         <div class="crop" id="cropBox" hidden>
           <canvas id="cropCanvas" aria-label="Выбор части картинки для холста"></canvas>
-          <p class="hint">Картинка шире или выше холста. Потяните светлую рамку, чтобы выбрать, какая часть попадёт в схему.</p>
+          <p class="hint keep">Картинка шире или выше холста. Потяните светлую рамку, чтобы выбрать, какая часть попадёт в схему.</p>
         </div>
       </section>
 
@@ -160,7 +180,6 @@
           <li>Крестик × — убрать цвет из схемы.</li>
           <li>Кисть — нарисовать контур или поправить отдельные стразы.</li>
         </ul>
-        <p class="hint">Первые три действия — в списке цветов рядом со схемой.</p>
         <button type="button" class="wide" id="stepBrush">✎ Включить кисть</button>
       </section>
 
@@ -193,6 +212,10 @@
           <p class="hint">Макет одним файлом JPEG, названным по артикулу и названию, — в таком виде его берёт типография. Цвета в RGB.</p>
           <label class="check"><input type="checkbox" id="withPdf"><span>Добавить в комплект PDF</span></label>
           <p class="hint">Макет и схема в PDF с точным размером листа — если типография просит PDF.</p>
+          <label>Запас страз, %
+            <input type="number" id="reserve" min="0" max="50" step="1" value="0" data-kind="meta">
+          </label>
+          <p class="hint">Сколько страз положить сверх схемы на случай потери. Обычно кладут 10–20 %. Вес в легенде, таблице расхода и на наклейках считается уже с запасом; число страз в схеме не меняется.</p>
           <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" maxlength="8" data-kind="meta"></label>
         </details>
         <button type="button" class="link" id="projSave" disabled title="Сохранить картинку, настройки и все ручные правки в один файл — чтобы вернуться к макету позже или на другом компьютере">Сохранить проект в файл</button>
@@ -207,7 +230,6 @@
       </div>
       <p class="status" id="status" role="status" aria-live="polite">Загрузите картинку, чтобы начать</p>
       <p class="foot">
-        <button type="button" class="link" id="hintsToggle">Скрыть подсказки</button>
         <button type="button" class="link" id="resetAll">Сбросить настройки</button>
         <span id="version"></span>
       </p>
@@ -216,7 +238,7 @@
 
   <main>
     <nav class="toolbar">
-      <button type="button" class="icon" id="panelToggle" aria-pressed="true" title="Скрыть или показать настройки" aria-label="Скрыть или показать настройки">☰</button>
+      <button type="button" class="icon" id="panelToggle" aria-pressed="true" title="Скрыть или показать настройки" aria-label="Скрыть или показать настройки"><svg class="ic" aria-hidden="true"><use href="#i-menu"></use></svg></button>
       <div class="tablist" role="tablist" aria-label="Что показать">
         <button role="tab" data-tab="original" aria-selected="false">Оригинал</button>
         <button role="tab" data-tab="mosaic" aria-selected="true">Мозаика</button>
@@ -226,12 +248,12 @@
         <button role="tab" data-tab="insert" aria-selected="false" title="Лист A4 в набор: значки и номера цветов">Вкладыш</button>
       </div>
       <div class="tools">
-        <button type="button" class="toggle" id="brushToggle" aria-pressed="false" disabled title="Рисовать по схеме: поставить стразы нужного цвета вручную">✎ Кисть</button>
-        <button type="button" class="icon" id="zoomOut" title="Уменьшить" aria-label="Уменьшить">−</button>
+        <button type="button" class="toggle" id="brushToggle" aria-pressed="false" disabled title="Рисовать по схеме: поставить стразы нужного цвета вручную"><svg class="ic" aria-hidden="true"><use href="#i-pencil"></use></svg><span>Кисть</span></button>
+        <button type="button" class="icon" id="zoomOut" title="Уменьшить" aria-label="Уменьшить"><svg class="ic" aria-hidden="true"><use href="#i-minus"></use></svg></button>
         <button type="button" class="zoom-label" id="zoomFit" title="Вписать в окно"><span id="zoomLabel">100%</span></button>
-        <button type="button" class="icon" id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
-        <button type="button" id="saveOne" disabled title="Скачать этот файл">↓ Файл</button>
-        <button type="button" class="toggle" id="colorsToggle" aria-pressed="true" disabled title="Скрыть или показать список цветов">Цвета</button>
+        <button type="button" class="icon" id="zoomIn" title="Увеличить" aria-label="Увеличить"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg></button>
+        <button type="button" id="saveOne" disabled title="Скачать этот файл"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>Файл</span></button>
+        <button type="button" class="toggle" id="colorsToggle" aria-pressed="true" disabled title="Скрыть или показать список цветов"><svg class="ic" aria-hidden="true"><use href="#i-palette"></use></svg><span>Цвета</span></button>
       </div>
     </nav>
     <div class="brushbar" id="brushBar" hidden>
@@ -250,8 +272,8 @@
         <option value="2">2 × 2</option>
         <option value="3">3 × 3</option>
       </select>
-      <button type="button" id="brushUndo" disabled title="Отменить последний мазок (Ctrl + Z)">↩ Отменить</button>
-      <button type="button" id="brushRedo" disabled title="Вернуть отменённое (Ctrl + Shift + Z)">↪ Вернуть</button>
+      <button type="button" id="brushUndo" disabled title="Отменить последний мазок (Ctrl + Z)"><svg class="ic" aria-hidden="true"><use href="#i-undo"></use></svg><span>Отменить</span></button>
+      <button type="button" id="brushRedo" disabled title="Вернуть отменённое (Ctrl + Shift + Z)"><svg class="ic" aria-hidden="true"><use href="#i-redo"></use></svg><span>Вернуть</span></button>
       <label class="check"><input type="checkbox" id="brushUnder"><span>Исходник поверх</span></label>
       <button type="button" class="link" id="brushClear" hidden>Стереть всю прорисовку</button>
       <p class="hint">Цвет кисти — нажмите на цвет в списке или «сменить». Shift + щелчок — прямая линия от прошлой точки. Ластик возвращает стразам цвет, который подобрал сервис. Двигать схему — правой кнопкой мыши или колесом. Клавиша V — сравнить с исходником.</p>
@@ -268,7 +290,7 @@
   </main>
 
   <aside class="colors" id="colorsPanel" hidden>
-    <h2>Цвета в схеме <button type="button" class="color-x" id="colorsClose" title="Скрыть список цветов" aria-label="Скрыть список цветов">×</button></h2>
+    <h2>Цвета в схеме <button type="button" class="color-x" id="colorsClose" title="Скрыть список цветов" aria-label="Скрыть список цветов"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button></h2>
     <div class="summary">
       <div><b id="sumColors">0</b><small>цветов</small></div>
       <div><b id="sumStones">0</b><small>страз</small></div>
@@ -289,7 +311,7 @@
           <h2 id="pickTitle">Заменить цвет</h2>
           <p id="pickSub"></p>
         </div>
-        <button type="button" class="icon" id="pickClose" title="Закрыть" aria-label="Закрыть">×</button>
+        <button type="button" class="icon" id="pickClose" title="Закрыть" aria-label="Закрыть"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
       </header>
       <input type="search" id="pickSearch" placeholder="Номер цвета, например 3865" autocomplete="off" aria-label="Найти номер цвета">
       <p class="hint" id="pickHint"></p>
@@ -306,7 +328,7 @@
           <h2 id="symTitle">Цвет на схеме</h2>
           <p>Номер и цвет страз не меняются — только то, как клетка напечатана на схеме, в легенде и макете.</p>
         </div>
-        <button type="button" class="icon" id="symClose" title="Закрыть" aria-label="Закрыть">×</button>
+        <button type="button" class="icon" id="symClose" title="Закрыть" aria-label="Закрыть"><svg class="ic" aria-hidden="true"><use href="#i-x"></use></svg></button>
       </header>
       <div class="pick-scroll">
         <h3>Значок</h3>
@@ -321,11 +343,13 @@
     </div>
   </dialog>
 
-  <script src="js/i18n.js?v=11"></script>
-  <script src="js/palette-dmc.js?v=11"></script>
-  <script src="js/files.js?v=11"></script>
-  <script src="js/engine.js?v=11"></script>
-  <script src="js/render.js?v=11"></script>
-  <script src="js/app.js?v=11"></script>
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+
+  <script src="js/i18n.js?v=12"></script>
+  <script src="js/palette-dmc.js?v=12"></script>
+  <script src="js/files.js?v=12"></script>
+  <script src="js/engine.js?v=12"></script>
+  <script src="js/render.js?v=12"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>

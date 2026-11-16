@@ -304,7 +304,7 @@
     x.font = '13px ' + FONT;
     x.fillStyle = '#555555';
     x.fillText(T('* Размер схемы в см и вес страз каждого цвета указаны ориентировочно для ') + stoneLabel(meta) + '.', pad, y);
-    x.fillText(T('Вес округлён вверх до целого грамма, из расчёта ') + String(meta.gramPerStone).replace('.', ',') + T(' г на одну стразу.'), pad, y + 20);
+    x.fillText(T('Вес округлён вверх до целого грамма, из расчёта ') + String(meta.gramBase || meta.gramPerStone).replace('.', ',') + T(' г на одну стразу') + (meta.reserve ? T(', с запасом ') + meta.reserve + ' %' : '') + '.', pad, y + 20);
     return cv;
   }
 
