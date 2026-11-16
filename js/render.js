@@ -592,8 +592,96 @@
   /* Лист-вкладыш в набор, A4 при 300 dpi: миниатюра, артикул, название, размер и таблица
    * «значок — номер DMC» без количества. K — масштаб (1 для печати, меньше для предпросмотра). */
   const INSERT_W = 2480, INSERT_H = 3507, INSERT_ROWS = 21;
+  /* Второй вид вкладыша — таблица в рамках с порядковым номером (он же номер пакетика):
+   * картинка и артикул слева вверху, таблица начинается под ними и продолжается справа. */
+  function renderInsertTable(res, meta, src, K) {
+    const W = INSERT_W, H = INSERT_H, M = 150;
+    const cv = A.makeCanvas(Math.round(W * K), Math.round(H * K)), x = cv.getContext('2d');
+    x.scale(K, K);
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, W, H);
+    const colors = printed(res.colors), n = colors.length;
+    const gap = 70, colW = (W - M * 2 - gap) / 2, top = 226;
+    // слева: картинка и артикул
+    let leftTop = top;
+    if (src) {
+      const iw = src.naturalWidth || src.width, ih = src.naturalHeight || src.height;
+      const rc = A.cropRect(iw, ih, res.cols, res.rows, meta.focusX, meta.focusY);
+      let tw = colW, th = (tw * res.rows) / res.cols;
+      if (th > 1300) { th = 1300; tw = (th * res.cols) / res.rows; }
+      x.imageSmoothingEnabled = true;
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(src, rc.x, rc.y, rc.w, rc.h, M + (colW - tw) / 2, top, tw, th);
+      leftTop = top + th + 40;
+    }
+    const head = meta.article || meta.title || '';
+    if (head) {
+      x.fillStyle = '#222222';
+      x.textAlign = 'center';
+      x.textBaseline = 'alphabetic';
+      x.font = '130px ' + FONT;
+      x.fillText(head, M + colW / 2, leftTop + 120, colW);
+      leftTop += 190;
+    }
+    // высота строки — такая, чтобы все цвета поместились в два столбца
+    let rowH = 129, leftRows = 0, rightRows = 0;
+    for (; rowH >= 60; rowH -= 3) {
+      leftRows = Math.max(0, Math.floor((H - M - leftTop) / rowH) - 1);
+      rightRows = Math.max(0, Math.floor((H - M - top) / rowH) - 1);
+      if (leftRows + rightRows >= n) break;
+    }
+    const widths = [0.26, 0.235, 0.235, 0.27].map(function (f) { return f * colW; });
+    const heads = [T('Номер'), T('Символ|на схеме'), T('Цвет'), T('Номер|цвета')];
+    function table(x0, y0, from, count) {
+      if (count <= 0) return;
+      x.strokeStyle = '#222222';
+      x.lineWidth = 3;
+      for (let rIdx = 0; rIdx <= count; rIdx++) {
+        const y = y0 + rIdx * rowH, c = rIdx ? colors[from + rIdx - 1] : null;
+        let cx = x0;
+        widths.forEach(function (w, col) {
+          x.strokeRect(cx, y, w, rowH);
+          x.fillStyle = '#111111';
+          x.textAlign = 'center';
+          x.textBaseline = 'middle';
+          if (!rIdx) {
+            const lines = heads[col].split('|'), fs = rowH * (lines.length > 1 ? 0.3 : 0.4);
+            x.font = Math.round(fs) + 'px ' + FONT;
+            lines.forEach(function (l, i) { x.fillText(l, cx + w / 2, y + rowH / 2 + (i - (lines.length - 1) / 2) * fs * 1.05, w - 12); });
+          } else if (col === 0) {
+            x.font = Math.round(rowH * 0.5) + 'px ' + FONT;
+            x.fillText(('0' + (from + rIdx)).slice(-2), cx + w / 2, y + rowH / 2 + 2);
+          } else if (col === 1) {
+            const sq = rowH * 0.74;
+            x.fillStyle = c.hex;
+            x.fillRect(cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
+            x.lineWidth = 2;
+            x.strokeRect(cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
+            x.lineWidth = 3;
+            drawSymbol(x, c, cx + w / 2, y + rowH / 2, sq * 0.78);
+          } else if (col === 2) {
+            x.fillStyle = c.hex;
+            x.fillRect(cx + w * 0.1, y + rowH * 0.15, w * 0.8, rowH * 0.7);
+            x.lineWidth = 2;
+            x.strokeRect(cx + w * 0.1, y + rowH * 0.15, w * 0.8, rowH * 0.7);
+            x.lineWidth = 3;
+          } else {
+            x.font = Math.round(rowH * 0.5) + 'px ' + FONT;
+            x.fillText(c.code, cx + w / 2, y + rowH / 2 + 2, w - 14);
+          }
+          cx += w;
+        });
+      }
+    }
+    const inLeft = Math.min(leftRows, Math.max(0, n - rightRows)); // слева — только то, что не вошло справа, как в образце
+    table(M, leftTop, 0, inLeft);
+    table(M + colW + gap, top, inLeft, Math.min(rightRows, n - inLeft));
+    return cv;
+  }
+
   function renderInsert(res, meta, src, K) {
     K = K || 1;
+    if (meta.insertStyle === 'table') return renderInsertTable(res, meta, src, K);
     const W = INSERT_W, H = INSERT_H;
     const cv = A.makeCanvas(Math.round(W * K), Math.round(H * K)), x = cv.getContext('2d');
     x.scale(K, K);
