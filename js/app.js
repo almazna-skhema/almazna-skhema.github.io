@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 18 · 16.11.2026';
+  const VERSION = T('версия') + ' 19 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -1138,7 +1138,8 @@
 
   function exportKinds() {
     return ['layout', 'scheme', 'mosaic', 'legend', 'insert', 'csv']
-      .concat($('withDocx').checked ? ['docx'] : [], $('withLabels').checked ? ['labels'] : [], $('withJpg').checked ? ['jpg'] : [], $('withPdf').checked ? ['pdf'] : []);
+      .concat($('withDocx').checked ? ['docx'] : [], // наклейки листом A4 убраны: этикетки печатают лентой на термопринтере
+         $('withJpg').checked ? ['jpg'] : [], $('withPdf').checked ? ['pdf'] : []);
   }
 
   function release(cv) { if (cv) cv.width = cv.height = 0; }
@@ -1202,7 +1203,7 @@
         } else if (kind === 'layout') {
           cv = A.renderLayout(res, p, img, cell, scheme);
           out.push({ name: FILE_NAMES.layout, data: await canvasPng(cv, pxmm) });
-          if (jpg) out.push({ name: baseName() + '.jpg', data: await canvasJpeg(cv, pxmm) });
+          if (jpg) out.push({ name: printName() + '.jpg', data: await canvasJpeg(cv, pxmm) });
           if (pdf) out.push({ name: T('Макет.pdf'), data: await canvasPdf(cv, pxmm) });
         } else if (kind === 'mosaic') {
           const mc = Math.min(cell, 16);
@@ -1247,6 +1248,13 @@
     return s || T('Схема ') + p.wCm + 'x' + p.hCm;
   }
 
+  /* Имя файла для типографии — как принято у заказчика: один артикул без «AS» (44179.jpg).
+   * Артикул не задан — обычное имя по названию. */
+  function printName() {
+    const a = String(state.p.article || '').replace(/^\s*AS\b\s*/i, '').replace(/[\u0000-\u001f\\/:*?"<>|]+/g, ' ').replace(/^[\s.]+/, '').trim().slice(0, 60);
+    return a || baseName();
+  }
+
   function download(parts, name, type) {
     const url = URL.createObjectURL(new Blob(parts, { type: type }));
     const a = document.createElement('a');
@@ -1263,9 +1271,10 @@
     flush(); // если настройки только что меняли — сначала досчитать, чтобы файл совпал с экраном
     if (!state.res) return;
     state.busy = true;
-    const old = button.textContent;
+    const lab = button.querySelector('span') || button; // у кнопок со значком меняем только подпись
+    const old = lab.textContent;
     $('zip').disabled = $('saveOne').disabled = true;
-    button.textContent = label;
+    lab.textContent = label;
     setStatus(T('Готовлю файлы в печатном качестве, это займёт несколько секунд…'));
     await wait(40);
     try {
@@ -1278,7 +1287,7 @@
       console.error(e);
       setStatus(T('Не получилось сохранить: браузеру не хватило памяти. Уменьшите размер холста или скачайте с компьютера.'), 'error');
     }
-    button.textContent = old;
+    lab.textContent = old;
     state.busy = false;
     $('zip').disabled = !state.res;
     $('saveOne').disabled = !state.res || state.tab === 'original';
@@ -1289,6 +1298,16 @@
       const name = baseName();
       const files = await buildFiles(exportKinds());
       download(A.zipStore(files), name + '.zip', 'application/zip');
+      return files.dpi;
+    });
+  }
+
+  /* Макет одним файлом JPEG — без архива: его сразу можно положить на диск для типографии. */
+  function saveJpg() {
+    return runExport($('jpgSave'), T('Готовлю файл…'), async function () {
+      const files = await buildFiles(['layout', 'jpg']);
+      const jpg = files.filter(function (f) { return /\.jpg$/.test(f.name); })[0];
+      download([jpg.data], jpg.name, 'image/jpeg');
       return files.dpi;
     });
   }
@@ -2369,6 +2388,9 @@
     $('autoLight').addEventListener('change', function () { saveSettings(); applyOverlays(); });
     $('withPdf').addEventListener('change', saveSettings);
     $('withJpg').addEventListener('change', saveSettings);
+    $('jpgSave').addEventListener('click', saveJpg);
+    // кнопка JPEG доступна тогда же, когда и скачивание комплекта
+    new MutationObserver(function () { $('jpgSave').disabled = $('zip').disabled; }).observe($('zip'), { attributes: true, attributeFilter: ['disabled'] });
     $('withLabels').addEventListener('change', saveSettings);
     $('withDocx').addEventListener('change', saveSettings);
     $('symSize').addEventListener('change', function () {

@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer">
   <title>Алмазная схема</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bea'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=18">
+  <link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
   <svg class="sprite" aria-hidden="true">
@@ -206,10 +206,9 @@
           <summary>Дополнительно</summary>
           <label class="check"><input type="checkbox" id="autoLight"><span>Печатать тёмные клетки светлее</span></label>
           <p class="hint">Чёрные и очень тёмные цвета на схеме станут серыми: значки читаются, краски уходит меньше. Номера и цвет страз не меняются.</p>
-          <label class="check"><input type="checkbox" id="withDocx" checked><span>Добавить этикетки для пакетиков (Word)</span></label>
-          <p class="hint">Файл Word с этикетками 24 × 14 мм, по одной на страницу: значок, номер цвета и количество страз. Первая этикетка — артикул и название. Если задан запас страз, количество указано уже с запасом.</p>
-          <label class="check"><input type="checkbox" id="withLabels"><span>Добавить наклейки листом A4</span></label>
-          <p class="hint">Листы A4 по 24 наклейки 70 × 37 мм: значок, номер DMC, вес. Для фасовки страз по пакетикам.</p>
+          <label class="check"><input type="checkbox" id="withDocx" checked><span>Этикетки для пакетиков (Word, 24 × 14 мм)</span></label>
+          <p class="hint">Файл Word для термопринтера с лентой этикеток 24 × 14 мм, по одной этикетке на страницу: значок, номер цвета и количество страз. Первая этикетка — артикул и название. Если задан запас страз, количество указано уже с запасом.</p>
+          <input type="checkbox" id="withLabels" hidden>
           <label class="check"><input type="checkbox" id="withJpg" checked><span>Добавить JPEG для типографии</span></label>
           <p class="hint">Макет одним файлом JPEG, названным по артикулу и названию, — в таком виде его берёт типография. Цвета в RGB.</p>
           <label class="check"><input type="checkbox" id="withPdf"><span>Добавить в комплект PDF</span></label>
@@ -235,6 +234,8 @@
           <p class="hint">Сколько страз положить сверх схемы на случай потери. Обычно кладут 10–20 %. Вес в легенде, таблице расхода и на наклейках считается уже с запасом; число страз в схеме не меняется.</p>
           <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" maxlength="8" data-kind="meta"></label>
         </details>
+        <button type="button" class="wide" id="jpgSave" disabled><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>JPEG для типографии</span></button>
+        <p class="hint">Макет одним файлом JPEG, без архива. Имя файла — артикул, например 44179.jpg. Его можно сразу отправить в типографию или положить на Google Диск.</p>
         <button type="button" class="link" id="projSave" disabled title="Сохранить картинку, настройки и все ручные правки в один файл — чтобы вернуться к макету позже или на другом компьютере">Сохранить проект в файл</button>
       </section>
     </div>
@@ -362,11 +363,11 @@
 
   <div class="tip" id="tip" role="tooltip" hidden></div>
 
-  <script src="js/i18n.js?v=18"></script>
-  <script src="js/palette-dmc.js?v=18"></script>
-  <script src="js/files.js?v=18"></script>
-  <script src="js/engine.js?v=18"></script>
-  <script src="js/render.js?v=18"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/i18n.js?v=19"></script>
+  <script src="js/palette-dmc.js?v=19"></script>
+  <script src="js/files.js?v=19"></script>
+  <script src="js/engine.js?v=19"></script>
+  <script src="js/render.js?v=19"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 </html>
