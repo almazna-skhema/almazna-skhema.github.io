@@ -8,10 +8,10 @@
   <meta name="referrer" content="no-referrer">
   <title>Алмазная схема</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bea'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=8">
+  <link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body>
-  <aside class="panel">
+  <aside class="panel" id="panel">
     <header class="brand">
       <div class="brand-mark" aria-hidden="true">◆</div>
       <div>
@@ -24,141 +24,181 @@
       </div>
     </header>
 
-    <section class="step">
-      <h2><span>1</span>Картинка</h2>
-      <input type="file" id="file" class="vh" accept="image/*" multiple tabindex="-1" aria-hidden="true">
-      <button type="button" class="drop" id="drop">
-        <span class="drop-thumb" id="dropThumb" aria-hidden="true">＋</span>
-        <span class="drop-text">
-          <b id="dropTitle">Выбрать картинку</b>
-          <small id="dropHint">или перетащите файл, или вставьте из буфера (Ctrl+V). Несколько картинок сразу — соберу комплект для каждой</small>
-        </span>
-      </button>
-      <div class="crop" id="cropBox" hidden>
-        <canvas id="cropCanvas" aria-label="Выбор части картинки для холста"></canvas>
-        <p class="hint">Картинка шире или выше холста. Потяните светлую рамку, чтобы выбрать, какая часть попадёт в схему.</p>
-      </div>
-    </section>
+    <nav class="stepper" aria-label="Этапы работы">
+      <button type="button" data-go="1" aria-current="step"><span>1</span>Картинка</button>
+      <button type="button" data-go="2" disabled><span>2</span>Холст</button>
+      <button type="button" data-go="3" disabled><span>3</span>Цвета</button>
+      <button type="button" data-go="4" disabled><span>4</span>Правка</button>
+      <button type="button" data-go="5" disabled><span>5</span>Макет</button>
+    </nav>
 
-    <section class="step">
-      <h2><span>2</span>Холст</h2>
-      <label>Размер
-        <select id="sizePreset">
-          <option value="20x20">20 × 20 см</option>
-          <option value="20x30">20 × 30 см</option>
-          <option value="30x30">30 × 30 см</option>
-          <option value="30x40">30 × 40 см</option>
-          <option value="40x50" selected>40 × 50 см</option>
-          <option value="40x60">40 × 60 см</option>
-          <option value="50x70">50 × 70 см</option>
-          <option value="60x80">60 × 80 см</option>
-          <option value="custom">Свой размер</option>
-        </select>
-      </label>
-      <div class="row">
-        <label>Ширина, см <input type="number" id="wCm" min="5" max="120" step="1" value="40" data-kind="full"></label>
-        <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст">⇄</button>
-        <label>Высота, см <input type="number" id="hCm" min="5" max="120" step="1" value="50" data-kind="full"></label>
-      </div>
-      <div class="seg" role="radiogroup" aria-label="Тип страз">
-        <label><input type="radio" name="shape" value="square" checked data-kind="full"><span>Квадратные 2,5 мм</span></label>
-        <label><input type="radio" name="shape" value="round" data-kind="full"><span>Круглые 2,8 мм</span></label>
-      </div>
-      <p class="stats" id="stats">160 × 200 страз</p>
-    </section>
+    <div class="steps" id="steps">
+      <section class="step" data-step="1">
+        <h2>Выберите картинку</h2>
+        <p class="lead">Из неё получится схема мозаики.</p>
+        <input type="file" id="file" class="vh" accept="image/*" multiple tabindex="-1" aria-hidden="true">
+        <button type="button" class="drop" id="drop">
+          <span class="drop-thumb" id="dropThumb" aria-hidden="true">＋</span>
+          <span class="drop-text">
+            <b id="dropTitle">Выбрать картинку</b>
+            <small id="dropHint">или перетащите файл, или вставьте из буфера (Ctrl+V). Несколько картинок сразу — соберу комплект для каждой</small>
+          </span>
+        </button>
+        <button type="button" class="link" id="projOpen" title="Открыть файл проекта и продолжить с того же места">Открыть сохранённый проект</button>
+        <input type="file" id="projFile" class="vh" accept=".almaz,.json,application/json" tabindex="-1" aria-hidden="true">
+      </section>
 
-    <section class="step">
-      <h2><span>3</span>Цвета</h2>
-      <div class="card">
-        <div class="card-info">
-          <b id="palName">Открытая таблица DMC</b>
-          <small id="palHint">454 цвета ниток — оттенки страз могут отличаться</small>
+      <section class="step" data-step="2" hidden>
+        <h2>Размер холста</h2>
+        <p class="lead">Какого размера будет готовая мозаика и какая часть картинки в неё попадёт.</p>
+        <label>Размер
+          <select id="sizePreset">
+            <option value="20x20">20 × 20 см</option>
+            <option value="20x30">20 × 30 см</option>
+            <option value="30x30">30 × 30 см</option>
+            <option value="30x40">30 × 40 см</option>
+            <option value="40x50" selected>40 × 50 см</option>
+            <option value="40x60">40 × 60 см</option>
+            <option value="50x70">50 × 70 см</option>
+            <option value="60x80">60 × 80 см</option>
+            <option value="custom">Свой размер</option>
+          </select>
+        </label>
+        <div class="row">
+          <label>Ширина, см <input type="number" id="wCm" min="5" max="120" step="1" value="40" data-kind="full"></label>
+          <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст">⇄</button>
+          <label>Высота, см <input type="number" id="hCm" min="5" max="120" step="1" value="50" data-kind="full"></label>
         </div>
-        <div class="card-actions">
-          <input type="file" id="palFile" class="vh" accept=".csv,.txt,text/csv,text/plain" tabindex="-1" aria-hidden="true">
-          <button type="button" id="palPick">Загрузить свою таблицу</button>
-          <button type="button" class="link" id="palSample">Скачать образец</button>
-          <button type="button" class="link" id="palReset" hidden>Вернуть стандартную</button>
+        <div class="seg" role="radiogroup" aria-label="Тип страз">
+          <label><input type="radio" name="shape" value="square" checked data-kind="full"><span>Квадратные 2,5 мм</span></label>
+          <label><input type="radio" name="shape" value="round" data-kind="full"><span>Круглые 2,8 мм</span></label>
         </div>
-      </div>
-      <label>Число цветов <output id="nColorsOut">26</output>
-        <input type="range" id="nColors" min="5" max="50" value="26" data-kind="full">
-      </label>
-      <label>Одиночные стразы
-        <select id="cleanup" data-kind="full">
-          <option value="0">Оставить как есть</option>
-          <option value="1" selected>Убрать мелкий шум</option>
-          <option value="2">Убрать сильнее</option>
-        </select>
-      </label>
-      <p class="hint">Одиночные стразы другого цвета неудобно выкладывать. Яркие акценты — звёзды, огоньки — остаются.</p>
-      <label class="check"><input type="checkbox" id="lines" data-kind="full"><span>Сохранять тонкие линии и контуры</span></label>
-      <p class="hint">Для рисунков с обводкой: тонкая тёмная линия не растворяется в фоне, и обводить её кистью почти не придётся. На фотографиях лучше выключить.</p>
-      <label>Не брать цвета, которых меньше, страз
-        <input type="number" id="minCount" min="0" max="9999" step="1" value="0" data-kind="full">
-      </label>
-      <p class="hint">Стразы редких цветов уйдут к ближайшему оттенку — не нужно фасовать пакетик ради десятка штук. 0 — оставить все.</p>
-      <label>Нет в наличии
-        <textarea id="stock" rows="2" maxlength="2000" placeholder="Номера через запятую: 3865, 819" data-kind="full"></textarea>
-      </label>
-      <p class="hint" id="stockNote">Эти цвета сервис не будет предлагать ни в одной схеме.</p>
-      <details>
-        <summary>Тонкая настройка</summary>
-        <label>Сглаживание <output id="smoothOut">20</output>
-          <input type="range" id="smooth" min="0" max="100" value="20" data-kind="full"></label>
-        <p class="hint">Убирает рябь в однородных зонах: небо, фон, кожа.</p>
-        <label>Плавные переходы <output id="ditherOut">0</output>
-          <input type="range" id="dither" min="0" max="100" value="0" step="5" data-kind="full"></label>
-        <p class="hint">Смешивает соседние цвета точками. Переходы мягче, но одиночных страз больше.</p>
-        <label>Яркость <output id="brightnessOut">0</output>
-          <input type="range" id="brightness" min="-50" max="50" value="0" data-kind="full"></label>
-        <label>Контраст <output id="contrastOut">0</output>
-          <input type="range" id="contrast" min="-50" max="50" value="0" data-kind="full"></label>
-        <label>Насыщенность <output id="saturationOut">0</output>
-          <input type="range" id="saturation" min="-100" max="100" value="0" data-kind="full"></label>
-        <button type="button" class="link" id="resetAdjust">Сбросить тонкую настройку</button>
-      </details>
-    </section>
+        <p class="stats" id="stats">160 × 200 страз</p>
+        <div class="crop" id="cropBox" hidden>
+          <canvas id="cropCanvas" aria-label="Выбор части картинки для холста"></canvas>
+          <p class="hint">Картинка шире или выше холста. Потяните светлую рамку, чтобы выбрать, какая часть попадёт в схему.</p>
+        </div>
+      </section>
 
-    <section class="step">
-      <h2><span>4</span>Макет для печати <em>необязательно</em></h2>
-      <label>Артикул <input type="text" id="article" maxlength="40" placeholder="AS 45462" data-kind="meta"></label>
-      <label>Название <input type="text" id="title" maxlength="80" placeholder="Зимові будиночки" data-kind="meta"></label>
-      <label>Адреса сайта (до трёх строк)
-        <textarea id="urls" rows="2" maxlength="300" placeholder="www.example.com" data-kind="meta"></textarea>
-      </label>
-      <div class="card">
-        <div class="card-info">
-          <b>QR-коды и логотип</b>
-          <small id="logoHint">До четырёх картинок — встанут в ряд внизу макета.</small>
+      <section class="step" data-step="3" hidden>
+        <h2>Цвета</h2>
+        <p class="lead">Сколько цветов взять и как их подобрать.</p>
+        <label>Число цветов <output id="nColorsOut">26</output>
+          <input type="range" id="nColors" min="5" max="50" value="26" data-kind="full">
+        </label>
+        <label>Одиночные стразы
+          <select id="cleanup" data-kind="full">
+            <option value="0">Оставить как есть</option>
+            <option value="1" selected>Убрать мелкий шум</option>
+            <option value="2">Убрать сильнее</option>
+          </select>
+        </label>
+        <p class="hint">Одиночные стразы другого цвета неудобно выкладывать. Яркие акценты — звёзды, огоньки — остаются.</p>
+        <label class="check"><input type="checkbox" id="lines" data-kind="full"><span>Сохранять тонкие линии и контуры</span></label>
+        <p class="hint">Для рисунков с обводкой: тонкая тёмная линия не растворяется в фоне, и обводить её кистью почти не придётся. На фотографиях лучше выключить.</p>
+        <details>
+          <summary>Таблица цветов и наличие</summary>
+          <div class="card">
+            <div class="card-info">
+              <b id="palName">Открытая таблица DMC</b>
+              <small id="palHint">454 цвета ниток — оттенки страз могут отличаться</small>
+            </div>
+            <div class="card-actions">
+              <input type="file" id="palFile" class="vh" accept=".csv,.txt,text/csv,text/plain" tabindex="-1" aria-hidden="true">
+              <button type="button" id="palPick">Загрузить свою таблицу</button>
+              <button type="button" class="link" id="palSample">Скачать образец</button>
+              <button type="button" class="link" id="palReset" hidden>Вернуть стандартную</button>
+            </div>
+          </div>
+          <label>Нет в наличии
+            <textarea id="stock" rows="2" maxlength="2000" placeholder="Номера через запятую: 3865, 819" data-kind="full"></textarea>
+          </label>
+          <p class="hint keep" id="stockNote">Эти цвета сервис не будет предлагать ни в одной схеме.</p>
+          <label>Не брать цвета, которых меньше, страз
+            <input type="number" id="minCount" min="0" max="9999" step="1" value="0" data-kind="full">
+          </label>
+          <p class="hint">Стразы редких цветов уйдут к ближайшему оттенку — не нужно фасовать пакетик ради десятка штук. 0 — оставить все.</p>
+        </details>
+        <details>
+          <summary>Тонкая настройка картинки</summary>
+          <label>Сглаживание <output id="smoothOut">20</output>
+            <input type="range" id="smooth" min="0" max="100" value="20" data-kind="full"></label>
+          <p class="hint">Убирает рябь в однородных зонах: небо, фон, кожа.</p>
+          <label>Плавные переходы <output id="ditherOut">0</output>
+            <input type="range" id="dither" min="0" max="100" value="0" step="5" data-kind="full"></label>
+          <p class="hint">Смешивает соседние цвета точками. Переходы мягче, но одиночных страз больше.</p>
+          <label>Яркость <output id="brightnessOut">0</output>
+            <input type="range" id="brightness" min="-50" max="50" value="0" data-kind="full"></label>
+          <label>Контраст <output id="contrastOut">0</output>
+            <input type="range" id="contrast" min="-50" max="50" value="0" data-kind="full"></label>
+          <label>Насыщенность <output id="saturationOut">0</output>
+            <input type="range" id="saturation" min="-100" max="100" value="0" data-kind="full"></label>
+          <button type="button" class="link" id="resetAdjust">Сбросить тонкую настройку</button>
+        </details>
+      </section>
+
+      <section class="step" data-step="4" hidden>
+        <h2>Правка вручную</h2>
+        <p class="lead">Проверьте схему и поправьте то, что не нравится. Этот шаг можно пропустить.</p>
+        <ul class="how">
+          <li>Карандаш ✎ у цвета — заменить номер на другой.</li>
+          <li>Квадратик со значком — поменять значок или цвет клетки.</li>
+          <li>Крестик × — убрать цвет из схемы.</li>
+          <li>Кисть — нарисовать контур или поправить отдельные стразы.</li>
+        </ul>
+        <p class="hint">Первые три действия — в списке цветов рядом со схемой.</p>
+        <button type="button" class="wide" id="stepBrush">✎ Включить кисть</button>
+      </section>
+
+      <section class="step" data-step="5" hidden>
+        <h2>Макет и файлы</h2>
+        <p class="lead">Подписи для печатного листа. Все поля необязательные.</p>
+        <label>Артикул <input type="text" id="article" maxlength="40" placeholder="AS 45462" data-kind="meta"></label>
+        <label>Название <input type="text" id="title" maxlength="80" placeholder="Зимові будиночки" data-kind="meta"></label>
+        <label>Адреса сайта (до трёх строк)
+          <textarea id="urls" rows="2" maxlength="300" placeholder="www.example.com" data-kind="meta"></textarea>
+        </label>
+        <div class="card">
+          <div class="card-info">
+            <b>QR-коды и логотип</b>
+            <small id="logoHint">До четырёх картинок — встанут в ряд внизу макета.</small>
+          </div>
+          <div class="logo-list" id="logoList" hidden></div>
+          <div class="card-actions">
+            <input type="file" id="logoFile" class="vh" accept="image/*" multiple tabindex="-1" aria-hidden="true">
+            <button type="button" id="logoPick">Добавить картинки</button>
+          </div>
         </div>
-        <div class="logo-list" id="logoList" hidden></div>
-        <div class="card-actions">
-          <input type="file" id="logoFile" class="vh" accept="image/*" multiple tabindex="-1" aria-hidden="true">
-          <button type="button" id="logoPick">Добавить картинки</button>
-        </div>
-      </div>
-      <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" maxlength="8" data-kind="meta"></label>
-      <label class="check"><input type="checkbox" id="autoLight"><span>Печатать тёмные клетки светлее</span></label>
-      <p class="hint">Чёрные и очень тёмные цвета на схеме станут серыми: значки читаются, краски уходит меньше. Номера и цвет страз не меняются.</p>
-      <label class="check"><input type="checkbox" id="withPdf"><span>Добавить в комплект PDF</span></label>
-      <p class="hint">Макет и схема в PDF с точным размером листа — если типография просит PDF.</p>
-    </section>
+        <details>
+          <summary>Дополнительно</summary>
+          <label class="check"><input type="checkbox" id="autoLight"><span>Печатать тёмные клетки светлее</span></label>
+          <p class="hint">Чёрные и очень тёмные цвета на схеме станут серыми: значки читаются, краски уходит меньше. Номера и цвет страз не меняются.</p>
+          <label class="check"><input type="checkbox" id="withPdf"><span>Добавить в комплект PDF</span></label>
+          <p class="hint">Макет и схема в PDF с точным размером листа — если типография просит PDF.</p>
+          <label>Вес одной стразы, г <input type="text" id="gram" value="0,0057" inputmode="decimal" maxlength="8" data-kind="meta"></label>
+        </details>
+        <button type="button" class="link" id="projSave" disabled title="Сохранить картинку, настройки и все ручные правки в один файл — чтобы вернуться к макету позже или на другом компьютере">Сохранить проект в файл</button>
+      </section>
+    </div>
 
     <footer class="actions">
-      <button type="button" class="primary" id="zip" disabled>Скачать комплект (ZIP)</button>
+      <div class="nav">
+        <button type="button" id="stepBack" hidden>← Назад</button>
+        <button type="button" class="primary" id="stepNext" disabled>Далее →</button>
+        <button type="button" class="primary" id="zip" disabled hidden>Скачать комплект (ZIP)</button>
+      </div>
       <p class="status" id="status" role="status" aria-live="polite">Загрузите картинку, чтобы начать</p>
       <p class="foot">
-        <button type="button" class="link" id="projSave" disabled title="Сохранить картинку, настройки и все ручные правки в один файл — чтобы вернуться к макету позже или на другом компьютере">Сохранить проект</button>
-        <button type="button" class="link" id="projOpen" title="Открыть файл проекта и продолжить с того же места">Открыть проект</button>
-        <input type="file" id="projFile" class="vh" accept=".almaz,.json,application/json" tabindex="-1" aria-hidden="true">
+        <button type="button" class="link" id="hintsToggle">Скрыть подсказки</button>
+        <button type="button" class="link" id="resetAll">Сбросить настройки</button>
+        <span id="version"></span>
       </p>
-      <p class="foot"><button type="button" class="link" id="resetAll">Сбросить настройки</button><span id="version"></span></p>
     </footer>
   </aside>
 
   <main>
     <nav class="toolbar">
+      <button type="button" class="icon" id="panelToggle" aria-pressed="true" title="Скрыть или показать настройки" aria-label="Скрыть или показать настройки">☰</button>
       <div class="tablist" role="tablist" aria-label="Что показать">
         <button role="tab" data-tab="original" aria-selected="false">Оригинал</button>
         <button role="tab" data-tab="mosaic" aria-selected="true">Мозаика</button>
@@ -169,10 +209,10 @@
       <div class="tools">
         <button type="button" class="toggle" id="brushToggle" aria-pressed="false" disabled title="Рисовать по схеме: поставить стразы нужного цвета вручную">✎ Кисть</button>
         <button type="button" class="icon" id="zoomOut" title="Уменьшить" aria-label="Уменьшить">−</button>
-        <span class="zoom-label" id="zoomLabel">100%</span>
+        <button type="button" class="zoom-label" id="zoomFit" title="Вписать в окно"><span id="zoomLabel">100%</span></button>
         <button type="button" class="icon" id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
-        <button type="button" id="zoomFit">Вписать</button>
-        <button type="button" id="saveOne" disabled>Скачать этот файл</button>
+        <button type="button" id="saveOne" disabled title="Скачать этот файл">↓ Файл</button>
+        <button type="button" class="toggle" id="colorsToggle" aria-pressed="true" disabled title="Скрыть или показать список цветов">Цвета</button>
       </div>
     </nav>
     <div class="brushbar" id="brushBar" hidden>
@@ -208,7 +248,7 @@
   </main>
 
   <aside class="colors" id="colorsPanel" hidden>
-    <h2>Цвета в схеме</h2>
+    <h2>Цвета в схеме <button type="button" class="color-x" id="colorsClose" title="Скрыть список цветов" aria-label="Скрыть список цветов">×</button></h2>
     <div class="summary">
       <div><b id="sumColors">0</b><small>цветов</small></div>
       <div><b id="sumStones">0</b><small>страз</small></div>
@@ -261,11 +301,11 @@
     </div>
   </dialog>
 
-  <script src="js/i18n.js?v=8"></script>
-  <script src="js/palette-dmc.js?v=8"></script>
-  <script src="js/files.js?v=8"></script>
-  <script src="js/engine.js?v=8"></script>
-  <script src="js/render.js?v=8"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/i18n.js?v=9"></script>
+  <script src="js/palette-dmc.js?v=9"></script>
+  <script src="js/files.js?v=9"></script>
+  <script src="js/engine.js?v=9"></script>
+  <script src="js/render.js?v=9"></script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>

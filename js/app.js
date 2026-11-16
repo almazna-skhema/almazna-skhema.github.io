@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 8 · 16.11.2026';
+  const VERSION = T('версия') + ' 9 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -500,8 +500,7 @@
   function renderColorList() {
     const res = state.res, p = state.p;
     if (!res) return;
-    $('colorsPanel').hidden = false;
-    document.body.classList.add('with-colors');
+    applyUi();
     const list = $('colorList');
     list.textContent = '';
     const hi = highlightIndex();
@@ -759,6 +758,7 @@
     const b = state.brush, toggle = $('brushToggle');
     toggle.disabled = !state.res;
     toggle.setAttribute('aria-pressed', b.on ? 'true' : 'false');
+    $('stepBrush').textContent = b.on ? T('✎ Выключить кисть') : T('✎ Включить кисть');
     const on = paintActive();
     $('brushBar').hidden = !on;
     $('stage').classList.toggle('brush', on);
@@ -780,6 +780,7 @@
     state.brush.on = !state.brush.on;
     if (state.brush.on && state.highlightCode !== null) { state.highlightCode = null; dropCache(['mosaic', 'scheme']); }
     renderColorList(); // подсказки и отметка в списке зависят от режима
+    if (state.brush.on && ui.step !== 4) { setStep(4); return; } // кисть — часть этапа «Правка»
     if (state.brush.on && !paintTab()) selectTab('mosaic'); else { updateBrushBar(); showTab(); }
   }
 
@@ -1302,6 +1303,7 @@
         timer = null;
         pendingFull = false;
         recompute();
+        if (!batchRunning) setStep(opt.keep ? 4 : 2); // новая картинка — к размеру холста; сохранённая работа — сразу к правке
         resolve();
       };
       img.onerror = function () {
@@ -1793,6 +1795,71 @@
     if (!state.img) setStatus(T('Настройки сброшены'));
   }
 
+  // ---------- этапы и панели ----------
+  const ui = { step: 1, panel: true, colors: true, hints: true };
+  const STEP_NAMES = { 1: 'Картинка', 2: 'Холст', 3: 'Цвета', 4: 'Правка', 5: 'Макет' };
+
+  function loadUi() {
+    try {
+      const o = JSON.parse(localStorage.getItem('almaz-ui') || 'null');
+      if (o && typeof o === 'object') ['panel', 'colors', 'hints'].forEach(function (k) { if (typeof o[k] === 'boolean') ui[k] = o[k]; });
+    } catch (e) { /* игнорируем */ }
+  }
+
+  function saveUi() {
+    try { localStorage.setItem('almaz-ui', JSON.stringify({ panel: ui.panel, colors: ui.colors, hints: ui.hints })); } catch (e) { /* не запомнится */ }
+  }
+
+  /* Какие панели видны. Список цветов появляется только когда есть схема. */
+  function applyUi() {
+    const showColors = !!state.res && ui.colors;
+    document.body.classList.toggle('hide-panel', !ui.panel);
+    document.body.classList.toggle('no-hints', !ui.hints);
+    document.body.classList.toggle('with-colors', showColors);
+    $('colorsPanel').hidden = !showColors;
+    $('panelToggle').setAttribute('aria-pressed', ui.panel ? 'true' : 'false');
+    $('colorsToggle').setAttribute('aria-pressed', showColors ? 'true' : 'false');
+    $('colorsToggle').disabled = !state.res;
+    $('hintsToggle').textContent = ui.hints ? T('Скрыть подсказки') : T('Показать подсказки');
+    applyZoom(); // область просмотра изменила размер
+  }
+
+  function setPanels(patch) {
+    Object.keys(patch).forEach(function (k) { ui[k] = patch[k]; });
+    saveUi();
+    applyUi();
+    if (ui.step === 2) drawCrop();
+  }
+
+  /* Переход на этап: в панели остаются только его настройки, а справа открывается подходящий вид. */
+  function setStep(n) {
+    n = clamp(n | 0, 1, 5);
+    if (!state.img) n = 1;
+    ui.step = n;
+    document.querySelectorAll('[data-step]').forEach(function (sec) { sec.hidden = +sec.dataset.step !== n; });
+    document.querySelectorAll('[data-go]').forEach(function (b) {
+      const k = +b.dataset.go;
+      b.disabled = k > 1 && !state.img;
+      if (k === n) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+      b.classList.toggle('done', k < n);
+    });
+    $('stepBack').hidden = n === 1;
+    $('stepNext').hidden = n === 5;
+    $('stepNext').disabled = !state.img;
+    $('stepNext').textContent = n < 5 ? T('Далее: ') + T(STEP_NAMES[n + 1]) + ' →' : '';
+    $('zip').hidden = n !== 5;
+    $('panel').scrollTop = 0;
+    if (n === 2) drawCrop(); // рамка рисуется по ширине видимой панели
+    if (!state.res) return;
+    if (n !== 4 && state.brush.on) { // рисование остаётся на этапе «Правка»
+      state.brush.on = false;
+      renderColorList();
+    }
+    if (n === 4 && !ui.colors) setPanels({ colors: true }); // здесь без списка цветов не обойтись
+    const want = n === 1 ? 'original' : n === 5 ? 'layout' : paintTab() ? state.tab : 'mosaic';
+    if (state.tab !== want) { state.zoom = 1; selectTab(want); } else { updateBrushBar(); showTab(); }
+  }
+
   // ---------- события ----------
   function init() {
     A.translateDom(document.body);
@@ -1810,6 +1877,9 @@
     loadSettings();
     restorePalette();
     restoreMarks();
+    loadUi();
+    applyUi();
+    setStep(1);
     showLogos();
     restoreLogos();
     showStockNote();
@@ -1966,6 +2036,18 @@
     $('withPdf').addEventListener('change', saveSettings);
     $('stock').addEventListener('input', showStockNote);
 
+    // этапы и панели
+    document.querySelectorAll('[data-go]').forEach(function (b) {
+      b.addEventListener('click', function () { setStep(+b.dataset.go); });
+    });
+    $('stepBack').addEventListener('click', function () { setStep(ui.step - 1); });
+    $('stepNext').addEventListener('click', function () { setStep(ui.step + 1); });
+    $('stepBrush').addEventListener('click', toggleBrush);
+    $('panelToggle').addEventListener('click', function () { setPanels({ panel: !ui.panel }); });
+    $('colorsToggle').addEventListener('click', function () { setPanels({ colors: !ui.colors }); });
+    $('colorsClose').addEventListener('click', function () { setPanels({ colors: false }); });
+    $('hintsToggle').addEventListener('click', function () { setPanels({ hints: !ui.hints }); });
+
     // проект
     $('projSave').addEventListener('click', saveProject);
     $('projOpen').addEventListener('click', function () { $('projFile').click(); });
@@ -1991,6 +2073,7 @@
     toggleBrush: toggleBrush, setBrushCode: setBrushCode, undoStroke: undoStroke, clearPaint: clearPaint,
     setSymbol: setSymbol, setPrint: setPrint, openSymbols: openSymbols, addLogoFiles: addLogoFiles,
     redoStroke: redoStroke, runBatch: runBatch, saveProject: saveProject, openProjectFile: openProjectFile,
+    setStep: setStep, setPanels: setPanels, ui: ui,
     projectData: projectData, autosave: autosave, restoreWork: restoreWork, toggleOriginal: toggleOriginal, exportKinds: exportKinds
   };
   init();
