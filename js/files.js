@@ -168,6 +168,60 @@
     return jpg;
   }
 
+  /* Этикетки на пакетики в формате Word — как их набирают вручную: лента этикеток 24 × 14 мм,
+   * по одной на страницу. Первая — артикул и название, дальше на каждый цвет: значок в рамке,
+   * номер цвета крупно и количество страз. Возвращает части ZIP-файла (.docx) для Blob.
+   * data: { article, title, unit, rows: [{ symbol, code, count }] } */
+  function labelsDocx(data) {
+    const enc = new TextEncoder();
+    const esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    const FONT = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>';
+    const SYM = '<w:rFonts w:ascii="Segoe UI Symbol" w:hAnsi="Segoe UI Symbol" w:cs="Segoe UI Symbol"/>';
+    const run = function (text, half, bold, extra) {
+      return '<w:r><w:rPr>' + (extra || FONT) + (bold ? '<w:b/>' : '') + '<w:sz w:val="' + half + '"/><w:szCs w:val="' + half + '"/></w:rPr>' +
+        '<w:t xml:space="preserve">' + esc(text) + '</w:t></w:r>';
+    };
+    const para = function (inner, newPage) {
+      return '<w:p><w:pPr>' + (newPage ? '<w:pageBreakBefore/>' : '') +
+        '<w:spacing w:before="0" w:after="0" w:line="40" w:lineRule="atLeast"/><w:jc w:val="center"/></w:pPr>' + inner + '</w:p>';
+    };
+    const fit = function (chars, max) { // размер шрифта в полупунктах, чтобы строка влезла в 20 мм
+      return Math.max(14, Math.min(max, Math.floor(210 / Math.max(1, chars))));
+    };
+    let body = '';
+    const head = String(data.article || '').trim(), title = String(data.title || '').trim();
+    if (head || title) {
+      if (head) body += para(run(head, fit(head.length, 32), true), false);
+      if (title) body += para(run(title, fit(title.length * 1.05, 16), true), false);
+    }
+    data.rows.forEach(function (r, i) {
+      const sym = String(r.symbol).replace(/︎/g, ''), code = String(r.code);
+      const half = fit(code.length + 2.2, 40);
+      const plain = /^[0-9A-Za-z+=#%&@?*<>$]$/.test(sym); // буквы и цифры — обычным шрифтом, фигуры — шрифтом символов
+      const box = (plain ? FONT : SYM) + '<w:bdr w:val="single" w:sz="6" w:space="0" w:color="000000"/>';
+      body += para(run(sym, half, true, box) + run(' ' + code, half, true), i > 0 || !!(head || title));
+      body += para(run(r.count + (data.unit || ''), 18, false), false);
+    });
+    const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + body +
+      '<w:sectPr><w:pgSz w:w="1361" w:h="794"/><w:pgMar w:top="0" w:right="85" w:bottom="0" w:left="113" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>' +
+      '</w:body></w:document>';
+    const types = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+    const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+    return zipStore([
+      { name: '[Content_Types].xml', data: enc.encode(types) },
+      { name: '_rels/.rels', data: enc.encode(rels) },
+      { name: 'word/document.xml', data: enc.encode(doc) }
+    ]);
+  }
+
+  A.labelsDocx = labelsDocx;
   A.jpegSetDpi = jpegSetDpi;
   A.pdfFromJpeg = pdfFromJpeg;
   A.crc32 = crc32;

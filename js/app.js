@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 16 · 16.11.2026';
+  const VERSION = T('версия') + ' 17 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -22,7 +22,7 @@
     print: new Map(),                              // номер цвета → цвет клетки на схеме (#rrggbb)
     brush: { on: false, code: null, size: 1, tool: 'brush', under: false }
   };
-  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels', 'reserve', 'symSize', 'insertStyle'];
+  const SAVED = ['wCm', 'hCm', 'nColors', 'cleanup', 'smooth', 'urls', 'gram', 'minCount', 'stock', 'lines', 'autoLight', 'withPdf', 'withJpg', 'withLabels', 'reserve', 'symSize', 'insertStyle', 'withDocx'];
   // что входит в проект (настройки одной картинки)
   const PROJECT_FIELDS = ['wCm', 'hCm', 'cleanup', 'smooth', 'dither', 'brightness', 'contrast', 'saturation', 'article', 'title', 'urls', 'gram', 'minCount', 'lines', 'autoLight', 'reserve', 'symSize', 'insertStyle'];
   const DEFAULTS = { wCm: 40, hCm: 50, nColors: 26, cleanup: 1, smooth: 20, dither: 0, brightness: 0, contrast: 0, saturation: 0, gram: '0,0057', minCount: 0, lines: '0', autoLight: '0', reserve: 0 };
@@ -1138,7 +1138,7 @@
 
   function exportKinds() {
     return ['layout', 'scheme', 'mosaic', 'legend', 'insert', 'csv']
-      .concat($('withLabels').checked ? ['labels'] : [], $('withJpg').checked ? ['jpg'] : [], $('withPdf').checked ? ['pdf'] : []);
+      .concat($('withDocx').checked ? ['docx'] : [], $('withLabels').checked ? ['labels'] : [], $('withJpg').checked ? ['jpg'] : [], $('withPdf').checked ? ['pdf'] : []);
   }
 
   function release(cv) { if (cv) cv.width = cv.height = 0; }
@@ -1214,6 +1214,14 @@
         } else if (kind === 'insert') {
           cv = A.renderInsert(res, p, img, 1);
           out.push({ name: FILE_NAMES.insert, data: await canvasPng(cv, A.INSERT_PX_PER_MM) });
+        } else if (kind === 'docx') {
+          // этикетки для ленточного принтера — тот же файл Word, что раньше набирали вручную
+          const k = 1 + (p.reserve || 0) / 100;
+          const parts = A.labelsDocx({
+            article: p.article, title: p.title, unit: T('шт'),
+            rows: res.colors.map(function (c) { return { symbol: c.symbol, code: c.code, count: Math.ceil(c.count * k) }; })
+          });
+          out.push({ name: T('Этикетки') + ' ' + baseName() + '.docx', data: joinBytes(parts) });
         } else if (kind === 'labels') {
           const pages = A.renderLabels(res, p);
           for (let i = 0; i < pages.length; i++) {
@@ -2362,6 +2370,7 @@
     $('withPdf').addEventListener('change', saveSettings);
     $('withJpg').addEventListener('change', saveSettings);
     $('withLabels').addEventListener('change', saveSettings);
+    $('withDocx').addEventListener('change', saveSettings);
     $('symSize').addEventListener('change', function () {
       saveSettings();
       applySymbolSize();
