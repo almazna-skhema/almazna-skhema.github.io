@@ -14,7 +14,10 @@
    * буквы — шрифтом (греческие и кириллица, не похожие на латинские из основного набора). */
   const MORE_SHAPES = '▶◀◢◣⬟⬢✖◐◑◧◨⊕⊗◎▣'.split('');
   const MORE_LETTERS = 'ΔΣΦΨΩλπβθЖЯЮФШЭБДЛП'.split('');
-  const LIBRARY = ALL_SYMBOLS.concat(MORE_SHAPES, MORE_LETTERS);
+  /* Декоративные значки из шрифтов символов (звёзды, цветы, масти, фигурки). Как именно они
+   * выглядят, зависит от шрифтов компьютера, поэтому перед печатью стоит взглянуть на схему. */
+  const MORE_GLYPHS = ["\u2726\ufe0e", "\u2727\ufe0e", "\u272a\ufe0e", "\u272b\ufe0e", "\u272c\ufe0e", "\u272d\ufe0e", "\u272e\ufe0e", "\u272f\ufe0e", "\u2730\ufe0e", "\u2731\ufe0e", "\u2732\ufe0e", "\u2733\ufe0e", "\u2734\ufe0e", "\u2735\ufe0e", "\u2736\ufe0e", "\u2737\ufe0e", "\u2738\ufe0e", "\u2739\ufe0e", "\u273a\ufe0e", "\u273b\ufe0e", "\u273c\ufe0e", "\u273d\ufe0e", "\u273e\ufe0e", "\u273f\ufe0e", "\u2740\ufe0e", "\u2741\ufe0e", "\u2742\ufe0e", "\u2743\ufe0e", "\u2744\ufe0e", "\u2745\ufe0e", "\u2746\ufe0e", "\u2747\ufe0e", "\u2748\ufe0e", "\u2749\ufe0e", "\u274a\ufe0e", "\u274b\ufe0e", "\u2660\ufe0e", "\u2663\ufe0e", "\u2666\ufe0e", "\u2664\ufe0e", "\u2667\ufe0e", "\u2661\ufe0e", "\u2662\ufe0e", "\u2600\ufe0e", "\u2602\ufe0e", "\u260e\ufe0e", "\u2618\ufe0e", "\u2620\ufe0e", "\u2622\ufe0e", "\u262e\ufe0e", "\u262f\ufe0e", "\u2638\ufe0e", "\u265b\ufe0e", "\u265c\ufe0e", "\u265e\ufe0e", "\u265f\ufe0e", "\u266a\ufe0e", "\u266b\ufe0e", "\u2702\ufe0e", "\u2708\ufe0e", "\u2709\ufe0e", "\u270e\ufe0e", "\u2713\ufe0e", "\u2714\ufe0e", "\u2715\ufe0e", "\u2717\ufe0e", "\u2718\ufe0e", "\u271d\ufe0e", "\u2720\ufe0e", "\u2721\ufe0e", "\u2606\ufe0e", "\u263e\ufe0e", "\u2691\ufe0e", "\u2693\ufe0e", "\u2699\ufe0e"];
+  const LIBRARY = ALL_SYMBOLS.concat(MORE_SHAPES, MORE_LETTERS, MORE_GLYPHS);
   /* «Без страз»: клетка не выкладывается, на холсте там остаётся напечатанная картинка. */
   const EMPTY = '__empty__', EMPTY_CELL = 255;
   const MAX_PALETTE = 3000; // больше цветов в таблице не бывает, а расчёт начинает тормозить
@@ -558,6 +561,7 @@
   A.ALL_SYMBOLS = ALL_SYMBOLS;
   A.MORE_SHAPES = MORE_SHAPES;
   A.MORE_LETTERS = MORE_LETTERS;
+  A.MORE_GLYPHS = MORE_GLYPHS;
   A.LIBRARY = LIBRARY;
   A.MAX_COLORS = MAX_COLORS;
   A.MAX_PALETTE = MAX_PALETTE;

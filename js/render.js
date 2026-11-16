@@ -5,6 +5,7 @@
   const T = A.T; // перевод надписи на выбранный язык
 
   const FONT = 'Arial, Helvetica, sans-serif';
+  const SYMBOL_FONT = '"Segoe UI Symbol", "Apple Symbols", "Arial Unicode MS", "DejaVu Sans", "Noto Sans Symbols2", "Noto Sans Symbols", sans-serif';
   const MARGIN_MM = 50; // поля макета вокруг схемы (как в образце: 40x50 на листе 50x60)
 
   function shade(c, k) {
@@ -204,7 +205,8 @@
   function drawSymbol(x, c, cx, cy, size) {
     x.fillStyle = c.faint ? '#c4c4c4' : c.dark ? '#ffffff' : '#000000';
     if (c.symbol.length === 1 && A.SHAPES && (A.SHAPES.indexOf(c.symbol) >= 0 || A.MORE_SHAPES.indexOf(c.symbol) >= 0) && drawShape(x, c.symbol, cx, cy, size * 0.47)) return;
-    x.font = 'bold ' + Math.round(size) + 'px ' + FONT;
+    const glyph = c.symbol.length > 1; // декоративный значок: берём шрифты символов, без жирного начертания
+    x.font = (glyph ? '' : 'bold ') + Math.round(size) + 'px ' + (glyph ? SYMBOL_FONT : FONT);
     x.textAlign = 'center';
     x.textBaseline = 'alphabetic';
     const m = x.measureText(c.symbol);

@@ -4,7 +4,7 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const VERSION = T('версия') + ' 14 · 16.11.2026';
+  const VERSION = T('версия') + ' 15 · 16.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -1053,7 +1053,7 @@
     list.textContent = '';
     const owner = new Map();
     state.res.colors.forEach(function (o) { if (o.code !== c.code) owner.set(o.symbol, o.code); });
-    A.SHAPES.concat(A.MORE_SHAPES, A.SYMBOLS, A.MORE_LETTERS).forEach(function (sym) {
+    A.SHAPES.concat(A.MORE_SHAPES, A.SYMBOLS, A.MORE_LETTERS, A.MORE_GLYPHS).forEach(function (sym) {
       const taken = owner.get(sym);
       const b = el('button', 'sym-item' + (sym === c.symbol ? ' current' : '') + (taken ? ' used' : ''), sym);
       b.type = 'button';

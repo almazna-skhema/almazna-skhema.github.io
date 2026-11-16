@@ -351,7 +351,8 @@ button.toggle[aria-pressed="true"] { background: var(--accent); border-color: va
 .pick-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px; }
 .pick h3 { margin: 4px 0 0; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; }
 .sym-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 5px; }
-.sym-item { height: 38px; padding: 0; font-size: 19px; font-weight: 700; line-height: 1; }
+.sym-item { height: 38px; padding: 0; font-size: 19px; font-weight: 700; line-height: 1; font-family: Arial, "Segoe UI Symbol", "Apple Symbols", "Arial Unicode MS", sans-serif; }
+.swatch { font-family: Arial, "Segoe UI Symbol", "Apple Symbols", "Arial Unicode MS", sans-serif; }
 .sym-item.used { color: var(--muted); border-style: dashed; }
 .sym-item.current, .print-item.current { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
 .print-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
