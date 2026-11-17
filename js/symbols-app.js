@@ -1,10 +1,10 @@
-/* Раздел «Готовые макеты»: загрузить готовый макет JPEG, заменить рисунки значков, сохранить JPEG.
+/* Раздел «Готовые макеты»: загрузить готовый макет JPEG или PNG, заменить рисунки значков, сохранить в том же формате.
  * Цвета, количество и расположение клеток не меняются; блоки файла без изменений остаются байт в байт. */
 (function (A) {
   'use strict';
 
-  const T = A.T, J = A.jpegEdit, S = A.layoutScan;
-  const VERSION = T('версия') + ' 26 · 17.11.2026';
+  const T = A.T, J = A.jpegEdit, P = A.pngEdit, S = A.layoutScan;
+  const VERSION = T('версия') + ' 27 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // больше браузер не удержит вместе со всеми расчётами; на телефоне и планшете памяти меньше
   const PHONE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -12,7 +12,7 @@
   const PREVIEW_SIDE = 3200;
   const state = {
     bytes: null, name: '', scan: null, preview: null, base: null, k: 1, edits: new Map(), sel: -1, zoom: 1, busy: false,
-    order: [], crops: [], rev: 0, saved: true
+    order: [], crops: [], rev: 0, saved: true, png: false
   };
 
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
@@ -224,7 +224,7 @@
     renderRows();
     repaintPreview();
     const n = state.edits.size;
-    setStatus(n ? T('Заменено значков: ') + n + T('. Сохраните JPG, когда всё готово.') : T('Выберите значок слева, чтобы заменить его.'));
+    setStatus(n ? T('Заменено значков: ') + n + T('. Сохраните файл, когда всё готово.') : T('Выберите значок слева, чтобы заменить его.'));
   }
 
   // ---------- выбор нового значка ----------
@@ -296,15 +296,16 @@
   async function load(file) {
     if (!file) return;
     if (state.busy) { setStatus(T('Подождите: предыдущий макет ещё обрабатывается.')); return; }
-    if (!/\.jpe?g$/i.test(file.name) && file.type !== 'image/jpeg') { setStatus(T('Нужен макет в формате JPG.'), 'error'); return; }
+    if (!/\.(jpe?g|png)$/i.test(file.name) && file.type !== 'image/jpeg' && file.type !== 'image/png') { setStatus(T('Нужен макет в формате JPG или PNG.'), 'error'); return; }
     state.busy = true;
     $('save').disabled = true;
     setStatus(T('Читаю макет…'));
     await wait(30);
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const dec = J.decode(bytes, { maxPixels: MAX_PIXELS }), f = dec.frame;
-      await J.toPlanes(dec, function () { return wait(0); }, true);
+      const bytes = new Uint8Array(await file.arrayBuffer()), png = P.isPng(bytes);
+      // PNG читаем сразу в точки; JPEG — до коэффициентов, потом в точки
+      const dec = png ? await P.decode(bytes, { maxPixels: MAX_PIXELS, onStep: function () { return wait(0); } }) : J.decode(bytes, { maxPixels: MAX_PIXELS }), f = dec.frame;
+      if (!png) await J.toPlanes(dec, function () { return wait(0); }, true);
       setStatus(T('Ищу сетку и легенду…'));
       await wait(20);
       const g = S.grayPlane(dec), grid = S.findGrid(g, f.width, f.height);
@@ -317,7 +318,8 @@
       const preview = buildPreview(dec);
       // дальше нужны только найденные клетки; сам файл перечитаем при сохранении
       f.comps.forEach(function (c) { c.plane = null; c.coefs = null; });
-      state.bytes = bytes; state.name = file.name;
+      dec.alpha = null;
+      state.bytes = bytes; state.name = file.name; state.png = png;
       state.scan = Object.assign({ grid: grid, legend: legend, dec: { frame: f, adobe: dec.adobe } }, cl);
       state.preview = preview;
       state.edits = new Map();
@@ -331,7 +333,7 @@
       buildCrops();
       showLayout();
       const missing = cl.classes.filter(function (c) { return c.legend < 0; }).length;
-      const mode = f.comps.length === 4 ? 'CMYK' : f.comps.length === 3 ? 'RGB' : T('оттенки серого');
+      const mode = (png ? 'PNG · ' : 'JPG · ') + (f.comps.length === 4 ? 'CMYK' : f.comps.length === 3 ? 'RGB' : T('оттенки серого'));
       $('fileInfo').hidden = false;
       $('fileInfo').textContent = fmt(f.width) + ' × ' + fmt(f.height) + ' ' + T('точек') + ' · ' + mode + ' · ' + grid.cols + ' × ' + grid.rows + ' ' + T('клеток') + ' · ' + cl.classes.length + ' ' + T('значков');
       $('dropTitle').textContent = file.name;
@@ -348,7 +350,8 @@
         progressive: T('Этот JPG сохранён как «прогрессивный» — такие пока не поддерживаются. Пересохраните его как обычный JPG.'),
         big: T('Макет слишком большой для браузера.'),
         grid: T('Не удалось найти сетку схемы. Это точно готовый макет для печати?'),
-        notjpeg: T('Это не JPG.'),
+        notjpeg: T('Это не JPG и не PNG.'),
+        notpng: T('Это не JPG и не PNG.'),
         unsupported: T('Этот вид JPG не поддерживается. Пересохраните макет как обычный JPG.'),
         bits: T('Этот вид JPG не поддерживается. Пересохраните макет как обычный JPG.'),
         broken: T('Файл повреждён или скачан не полностью. Скачайте макет заново.')
@@ -384,15 +387,16 @@
     setStatus(T('Меняю значки в файле…'));
     await wait(30);
     const rev = state.rev; // правки берём сейчас; если поменяют во время сохранения, файл уже не последний
+    const edits = [], opt = { size: +$('size').value / 100, legend: $('inLegend').checked };
+    state.edits.forEach(function (sym, k) { edits.push({ k: k, symbol: sym }); });
     try {
-      const dec = J.decode(state.bytes), sc = state.scan;
+      const sc = state.scan, png = state.png, step = function () { return wait(0); };
+      const dec = png ? await P.decode(state.bytes, { onStep: step }) : J.decode(state.bytes);
       const scan = { grid: sc.grid, legend: sc.legend, classes: sc.classes, cells: sc.cells, cellBg: sc.cellBg, legendFeats: sc.legendFeats };
-      const edits = [];
-      state.edits.forEach(function (sym, k) { edits.push({ k: k, symbol: sym }); });
-      const r = S.applyEdits(dec, scan, edits, maskFor, { size: +$('size').value / 100, legend: $('inLegend').checked });
+      const r = S.applyEdits(dec, scan, edits, maskFor, opt);
       await wait(20);
-      const parts = J.encode(dec);
-      const url = URL.createObjectURL(new Blob(parts, { type: 'image/jpeg' }));
+      const parts = png ? await P.encode(dec, state.bytes, step) : J.encode(dec);
+      const url = URL.createObjectURL(new Blob(parts, { type: png ? 'image/png' : 'image/jpeg' }));
       const a = document.createElement('a');
       a.href = url; a.download = state.name;
       document.body.appendChild(a); a.click(); a.remove();

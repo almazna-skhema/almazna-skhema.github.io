@@ -4,6 +4,7 @@
   'use strict';
 
   const MAX_GROUPS = 800;
+  const SAME_MASK = 0.6, SAME_SHADE = 100; // см. mergeScore
 
   /* Яркость каждой точки в полном разрешении — только для поиска сетки и легенды. */
   function grayPlane(dec) {
@@ -321,6 +322,14 @@
   // одна мера на цвет и форму: шум внутри одной позначки даёт около 1, разные позначки — от 10
   function score(ft, t) { return colorDist(ft.bg, t.bg) / 9 + maskDist(ft.mask, t.mask); }
 
+  /* Для слияния групп: одинаковая форма значка (у разных позначек от 2, у одной — меньше 0,1) и близкий
+   * цвет — это одна позначка, даже если файл пересохраняли с переводом цвета и оттенок «поплыл». */
+  function mergeScore(a, b) {
+    const s = score(a, b);
+    if (s <= 4) return s;
+    return maskDist(a.mask, b.mask) < SAME_MASK && colorDist(a.bg, b.bg) / a.bg.length < SAME_SHADE ? 4 : s;
+  }
+
   function meanOf(feats, idx) {
     const nb = feats[0].bg.length, bg = new Float64Array(nb), mask = new Float32Array(N * N);
     idx.forEach(function (i) { const ft = feats[i]; for (let j = 0; j < nb; j++) bg[j] += ft.bg[j]; for (let j = 0; j < N * N; j++) mask[j] += ft.mask[j]; });
@@ -368,7 +377,7 @@
         rowMin[a] = m; rowArg[a] = arg;
       };
       for (let a = 0; a < n; a++) {
-        for (let b = a + 1; b < n; b++) sc[a * n + b] = score(tpls[a], tpls[b]);
+        for (let b = a + 1; b < n; b++) sc[a * n + b] = mergeScore(tpls[a], tpls[b]);
         if (onStep && a % 64 === 63) await onStep();
       }
       for (let a = 0; a < n; a++) fillRow(a);
@@ -384,7 +393,7 @@
         for (let x = 0; x < n; x++) {
           if (!alive[x] || x === pa) continue;
           const lo = Math.min(x, pa), hi = Math.max(x, pa);
-          sc[lo * n + hi] = score(tpls[lo], tpls[hi]);
+          sc[lo * n + hi] = mergeScore(tpls[lo], tpls[hi]);
         }
         for (let a = 0; a < n; a++) {
           if (!alive[a]) continue;
@@ -412,6 +421,21 @@
       const remap = new Int32Array(mem.length).fill(-1);
       keep.forEach(function (k, j) { remap[k] = j; });
       for (let i = 0; i < cells.length; i++) cells[i] = remap[cells[i]];
+    }
+    // 3а) после распределения образцы точнее — ещё раз сливаем одну позначку, распавшуюся на оттенки
+    for (;;) {
+      let pa = -1, pb = -1;
+      for (let a = 0; a < tpls.length && pa < 0; a++) for (let b = a + 1; b < tpls.length; b++) {
+        if (maskDist(tpls[a].mask, tpls[b].mask) < SAME_MASK && colorDist(tpls[a].bg, tpls[b].bg) / tpls[a].bg.length < SAME_SHADE) { pa = a; pb = b; break; }
+      }
+      if (pa < 0) break;
+      const m = [];
+      for (let i = 0; i < cells.length; i++) {
+        if (cells[i] === pb) cells[i] = pa; else if (cells[i] > pb) cells[i]--;
+        if (cells[i] === pa) m.push(i);
+      }
+      tpls.splice(pb, 1);
+      tpls[pa] = meanOf(feats, m);
     }
     // сомнительные клетки: второй образец почти так же близок
     let doubtful = 0;
@@ -445,11 +469,12 @@
     return { cells: cells, classes: classes, doubtful: doubtful, legendFeats: legFeats, cellBg: cellBg };
   }
 
-  /* Замена значков в свежеразобранном файле (только коэффициенты, без точек).
+  /* Замена значков в свежеразобранном файле. JPEG — только коэффициенты блоков под клетками;
+   * PNG (dec.png) — прямо точки в плоскостях, их потом записывает pngEdit.encode.
    * edits: [{ k: номер позначки, symbol }]; maskFor(w, h, symbol, size) → покрытие значком 0…1 для области w×h.
    * size — размер значка в долях клетки. Меняются только блоки 8×8 под перерисованными клетками. */
   function applyEdits(dec, scan, edits, maskFor, opt) {
-    const f = dec.frame, J = A.jpegEdit, grid = scan.grid, nb = f.comps.length;
+    const f = dec.frame, J = A.jpegEdit, grid = scan.grid, nb = f.comps.length, direct = !!dec.png;
     const touched = f.comps.map(function () { return new Map(); }); // блок → его точки
     function samples(ci, bi) {
       const t = touched[ci];
@@ -475,8 +500,10 @@
           }
           a /= n || 1;
           const val = Math.round(bg[ci] + a * (ink[ci] - bg[ci]));
+          const cl = val < 0 ? 0 : val > 255 ? 255 : val;
+          if (direct) { c.plane[v * c.pw + u] = cl; continue; }
           const bi = (v >> 3) * c.bpl + (u >> 3);
-          samples(ci, bi)[(v & 7) * 8 + (u & 7)] = val < 0 ? 0 : val > 255 ? 255 : val;
+          samples(ci, bi)[(v & 7) * 8 + (u & 7)] = cl;
         }
       });
     }
