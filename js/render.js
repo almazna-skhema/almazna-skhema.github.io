@@ -68,8 +68,37 @@
       x.fillRect(0, 0, cv.width, cv.height);
       if (under) { x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(under, 0, 0, cv.width, cv.height); }
     }
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i] !== A.EMPTY_CELL) x.drawImage(sprites[cells[i]], (i % cols) * s, ((i / cols) | 0) * s);
+    if (s !== (s | 0) || s < 1) {
+      for (let i = 0; i < cells.length; i++) {
+        if (cells[i] !== A.EMPTY_CELL) x.drawImage(sprites[cells[i]], (i % cols) * s, ((i / cols) | 0) * s);
+      }
+      return cv;
+    }
+    /* Клетки копируем точками полосами, а не drawImage на каждую клетку: на схеме 800 × 800
+     * это в несколько раз быстрее. Значки непрозрачные, так что результат тот же. */
+    const W = cv.width, px = sprites.map(function (sp) {
+      return new Uint32Array(sp.getContext('2d').getImageData(0, 0, s, s).data.buffer);
+    });
+    const band = Math.max(1, Math.floor(4e6 / (W * s))); // строк клеток в полосе: до 16 МБ памяти
+    for (let r0 = 0; r0 < res.rows; r0 += band) {
+      const nr = Math.min(band, res.rows - r0), bh = nr * s;
+      const im = res.empty ? x.getImageData(0, r0 * s, W, bh) : x.createImageData(W, bh);
+      const out = new Uint32Array(im.data.buffer);
+      for (let r = 0; r < nr; r++) {
+        const row = (r0 + r) * cols;
+        for (let c = 0; c < cols; c++) {
+          const k = cells[row + c];
+          if (k === A.EMPTY_CELL) continue;
+          const sp = px[k];
+          let o = r * s * W + c * s, q = 0;
+          if (s >= 12) {
+            for (let yy = 0; yy < s; yy++, o += W, q += s) out.set(sp.subarray(q, q + s), o);
+          } else {
+            for (let yy = 0; yy < s; yy++, o += W) for (let xx = 0; xx < s; xx++) out[o + xx] = sp[q++];
+          }
+        }
+      }
+      x.putImageData(im, 0, r0 * s);
     }
     return cv;
   }

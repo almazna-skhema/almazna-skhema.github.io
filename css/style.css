@@ -87,7 +87,25 @@ body.hide-panel .panel { display: none; }
 .sections a { flex: 1; text-align: center; padding: 7px 6px; border-radius: 7px; font-size: 13px; color: var(--muted); text-decoration: none; }
 .sections a:hover { color: var(--ink); }
 .sections a[aria-current="page"] { background: var(--panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(20, 30, 60, 0.16); }
+.sections.three a { font-size: 12px; padding: 7px 4px; }
 .stepper.four { grid-template-columns: repeat(4, 1fr); }
+/* готовые макеты: список значков и подсветка */
+.sym-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto; }
+.sym-rows li { display: flex; align-items: center; gap: 4px; }
+.sym-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 5px 8px; text-align: left; }
+.sym-row[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.row-thumb { flex: none; display: flex; align-items: center; height: 34px; background: #fff; border-radius: 5px; padding: 0 3px; overflow: hidden; max-width: 150px; }
+.row-thumb img { height: 34px; display: block; }
+.row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }
+.row-info b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.warn-text { color: #c07a00; }
+.row-target { flex: none; font-size: 18px; font-weight: 700; color: var(--muted); min-width: 34px; text-align: right; font-family: Arial, "Segoe UI Symbol", "Apple Symbols", "Arial Unicode MS", sans-serif; }
+.row-target.set { color: var(--accent); }
+.holder canvas.overlay { pointer-events: none; background: none; box-shadow: none; }
+body.ready-layouts .stage { cursor: grab; }
+#symWarn { color: #c07a00; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+#symWarn[hidden] { display: none; }
+#symWarn img { height: 30px; border-radius: 4px; background: #fff; }
 .stepper.four::before { left: 12.5%; right: 12.5%; }
 .actions .quality { margin-bottom: 8px; }
 .quality { font-size: 12.5px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; background: var(--field); border: 1px solid var(--line); color: var(--ok); }

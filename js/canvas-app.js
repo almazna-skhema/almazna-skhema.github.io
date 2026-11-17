@@ -4,8 +4,8 @@
   'use strict';
 
   const T = A.T;
-  const ASSET_VERSION = 22; // тот же номер, что в адресах скриптов в canvas.html
-  const VERSION = T('версия') + ' 22 · 16.11.2026';
+  const ASSET_VERSION = 25; // тот же номер, что в адресах скриптов в canvas.html
+  const VERSION = T('версия') + ' 25 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // телефоны и планшеты не держат большие холсты в памяти — там пределы скромнее
   const COARSE = !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -281,7 +281,7 @@
           const bin = atob(A.CMYK_LUT.base64), data = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
           resolve({ n: A.CMYK_LUT.n, data: data });
-        } catch (e) { reject(e); }
+        } catch (e) { cmykLut = null; reject(e); }
       };
       sc.onerror = function () { cmykLut = null; reject(new Error('cmyk')); };
       document.head.appendChild(sc);
@@ -393,7 +393,15 @@
     if (change.flipX) state.flipX = !state.flipX;
     if (change.flipY) state.flipY = !state.flipY;
     state.fx = state.fy = 0.5;
-    rebuildSource();
+    try {
+      rebuildSource();
+    } catch (e) { // не хватило памяти на повёрнутую копию — возвращаем как было
+      console.error(e);
+      if (change.rot) { state.rot = (state.rot - change.rot + 360) % 360; const w = $('wCm').value; $('wCm').value = $('hCm').value; $('hCm').value = w; }
+      if (change.flipX) state.flipX = !state.flipX;
+      if (change.flipY) state.flipY = !state.flipY;
+      setStatus(T('Не получилось повернуть: браузеру не хватило памяти.'), 'error');
+    }
     syncOutputs();
     redraw();
   }
@@ -545,10 +553,11 @@
     stage.addEventListener('pointerdown', function (e) {
       if (!state.src || state.tab !== 'layout' || e.target !== $('holder').firstChild) return;
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ } // и второй палец: иначе его отпускание можно потерять
       if (touches.size === 2) { pinch = { d: dist(), zoom: +$('zoom').value }; drag = null; return; }
+      if (touches.size > 2) return;
       drag = { x: e.clientX, y: e.clientY, fx: state.fx, fy: state.fy };
       stage.classList.add('panning');
-      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
     });
     stage.addEventListener('pointermove', function (e) {
       if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -566,8 +575,11 @@
       if (slackY > 0.5) state.fy = clamp(drag.fy - (e.clientY - drag.y) / s / slackY, 0, 1);
       redraw();
     });
-    ['pointerup', 'pointercancel'].forEach(function (ev) {
-      stage.addEventListener(ev, function (e) { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; drag = null; stage.classList.remove('panning'); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) {
+      stage.addEventListener(ev, function (e) {
+        if (!touches.has(e.pointerId) && ev === 'lostpointercapture') return;
+        touches.delete(e.pointerId); if (touches.size < 2) pinch = null; drag = null; stage.classList.remove('panning');
+      });
     });
     stage.addEventListener('wheel', function (e) {
       if (!(e.ctrlKey || e.metaKey) || !state.src || state.tab !== 'layout') return;

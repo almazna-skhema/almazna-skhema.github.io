@@ -4,8 +4,8 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const ASSET_VERSION = 22; // тот же номер, что в адресах скриптов в index.html
-  const VERSION = T('версия') + ' 22 · 16.11.2026';
+  const ASSET_VERSION = 25; // тот же номер, что в адресах скриптов в index.html
+  const VERSION = T('версия') + ' 25 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -31,8 +31,9 @@
   const MAX_CM = 200; // самый большой холст по одной стороне
   const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
   const MAX_IMAGE_PIXELS = 150e6;
+  const JPEG_MAX_PIXELS = 170e6; // файл для типографии: 300 dpi до холста 100 × 100 см с полями
   const PICK_LIMIT = 120; // сколько цветов показывать в окне замены
-  const MAX_LOGOS = 4, LOGO_SIDE = 800, UNDO_LIMIT = 60, MAX_BATCH = 20;
+  const MAX_LOGOS = 4, LOGO_SIDE = 800, UNDO_LIMIT = 60, UNDO_CELLS = 2e6, MAX_BATCH = 20;
 
   // ---------- мелочи ----------
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
@@ -177,7 +178,8 @@
   // ---------- расчёт ----------
   let timer = null, pendingFull = false;
 
-  function schedule(full) {
+  /* typing — правка в поле ввода: ждём, пока допечатают, а не пересчитываем на каждую цифру */
+  function schedule(full, typing) {
     syncOutputs();
     saveSettings();
     if (!state.img) { state.p = params(); updateStats(); return; }
@@ -185,7 +187,7 @@
     pendingFull = pendingFull || full; // пересчёт не должен теряться, если следом поменяли текстовое поле
     clearTimeout(timer);
     if (pendingFull) setStatus(T('Считаю…'));
-    timer = setTimeout(flush, pendingFull ? 140 : 250);
+    timer = setTimeout(flush, typing ? 600 : pendingFull ? 140 : 250);
   }
 
   function flush() {
@@ -281,10 +283,24 @@
   }
 
   /* Убирает холсты предпросмотра из памяти (на планшетах она быстро кончается). */
+  /* Холст, который ещё на экране или нужен идущей выгрузке, освобождаем позже: иначе на миг
+   * пустеет просмотр, а выгрузка падает на пустом холсте, если во время неё тронули настройки. */
+  let retired = [], exporting = 0;
   function dropCache(kinds) {
     (kinds || Object.keys(state.cache)).forEach(function (k) {
-      release(state.cache[k]);
+      const cv = state.cache[k];
+      if (cv && (cv.isConnected || exporting)) retired.push(cv); else release(cv);
       delete state.cache[k];
+    });
+  }
+
+  function releaseRetired() {
+    if (exporting) return;
+    retired = retired.filter(function (cv) {
+      if (cv.isConnected) return true;
+      for (const k in state.cache) if (state.cache[k] === cv) return false; // снова в работе
+      release(cv);
+      return false;
     });
   }
 
@@ -311,6 +327,7 @@
       updateBrushBar();
       dropCache();
       $('holder').textContent = '';
+      releaseRetired();
       $('holder').hidden = true;
       $('empty').hidden = false;
       $('zip').disabled = $('saveOne').disabled = true;
@@ -441,14 +458,22 @@
     const cv = getCanvas(state.tab);
     // в режиме кисти поверх схемы можно положить полупрозрачный исходник — обводить по нему контур
     const ghost = paintActive() && state.brush.under ? getCanvas('original') : null;
-    if (holder.firstChild !== cv || holder.children.length !== (ghost ? 2 : 1) || (ghost && holder.lastChild !== ghost)) {
-      holder.textContent = '';
+    const stage = $('stage'), sl = stage.scrollLeft, st = stage.scrollTop, old = holder.firstChild;
+    if (old !== cv || holder.children.length !== (ghost ? 2 : 1) || (ghost && holder.lastChild !== ghost)) {
+      // новая картинка того же вида встаёт на место старой сразу в её размере — иначе область
+      // просмотра на миг пустеет, прокрутка сбрасывается и увеличенная схема «уезжает» после каждого мазка
+      const same = old && old.width === cv.width && old.height === cv.height;
       cv.className = '';
-      holder.appendChild(cv);
-      if (ghost) { ghost.className = 'ghost'; holder.appendChild(ghost); }
+      if (same) { cv.style.width = old.style.width; cv.style.height = old.style.height; }
+      if (ghost) ghost.className = 'ghost';
+      if (holder.replaceChildren) holder.replaceChildren.apply(holder, ghost ? [cv, ghost] : [cv]);
+      else { holder.textContent = ''; holder.appendChild(cv); if (ghost) holder.appendChild(ghost); }
+      if (same) { stage.scrollLeft = sl; stage.scrollTop = st; }
     }
     $('saveOne').disabled = state.tab === 'original' || state.busy;
     applyZoom();
+    if (old && old !== cv && old.width === cv.width && old.height === cv.height) { stage.scrollLeft = sl; stage.scrollTop = st; }
+    releaseRetired();
   }
 
   function selectTab(tab) {
@@ -909,10 +934,17 @@
     if (!st) return;
     if (st.changes.size) {
       state.redo = [];
-      state.undo.push(st.changes);
-      if (state.undo.length > UNDO_LIMIT) state.undo.shift();
+      pushUndo(st.changes);
       applyOverlays();
     } else updateBrushBar();
+  }
+
+  /* Шаги «Отменить» храним в пределах разумной памяти: заливка большого холста — это сотни тысяч клеток. */
+  function pushUndo(ch) {
+    state.undo.push(ch);
+    let total = 0;
+    state.undo.forEach(function (m) { total += m.size; });
+    while (state.undo.length > 1 && (state.undo.length > UNDO_LIMIT || total > UNDO_CELLS)) total -= state.undo.shift().size;
   }
 
   /* Возвращает клеткам прежние значения и отдаёт обратную правку — для «Вернуть». */
@@ -943,8 +975,7 @@
     if (!paintFits()) return;
     const cells = state.paint.cells;
     state.redo = [];
-    state.undo.push(new Map(cells)); // стирание тоже можно отменить
-    if (state.undo.length > UNDO_LIMIT) state.undo.shift();
+    pushUndo(new Map(cells)); // стирание тоже можно отменить
     cells.clear();
     applyOverlays();
     setStatus(T('Прорисовка стёрта. Кнопка «Отменить» вернёт её.'));
@@ -952,6 +983,7 @@
 
   function paintDown(e) {
     if (!paintActive() || e.button !== 0 || e.target !== $('holder').firstChild) return false; // правая и средняя кнопки двигают схему
+    if (e.pointerType === 'touch' && !e.isPrimary) return true; // второй палец — это жест масштаба, а не мазок
     const c = cellAt(e), res = state.res, b = state.brush;
     if (!c) return false;
     e.preventDefault();
@@ -1144,7 +1176,7 @@
           const bin = atob(A.CMYK_LUT.base64), data = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
           resolve({ n: A.CMYK_LUT.n, data: data });
-        } catch (e) { reject(e); }
+        } catch (e) { cmykLut = null; reject(e); }
       };
       sc.onerror = function () { cmykLut = null; reject(new Error('cmyk')); };
       document.head.appendChild(sc);
@@ -1159,18 +1191,26 @@
     let small = null;
     try {
       const lut = await loadCmykLut();
-      const k = (300 / 25.4) / pxPerMm;
+      // 300 dpi; огромные холсты (больше ~120 × 120 см) — с меньшим, иначе файл на сотни мегабайт
+      let dpi = 300, k = (dpi / 25.4) / pxPerMm;
+      const area = cv.width * cv.height * k * k;
+      if (area > JPEG_MAX_PIXELS) { dpi = Math.floor(dpi * Math.sqrt(JPEG_MAX_PIXELS / area)); k = (dpi / 25.4) / pxPerMm; }
       const w = Math.max(8, Math.round(cv.width * k)), h = Math.max(8, Math.round(cv.height * k));
-      small = A.makeCanvas(w, h);
+      // пересчитываем полосами по 256 строк: целый холст в 300 dpi мог не влезть в память браузера
+      const BAND = 256;
+      small = A.makeCanvas(w, BAND);
       const x = small.getContext('2d', { willReadFrequently: true });
       x.imageSmoothingEnabled = true;
       x.imageSmoothingQuality = 'high';
-      x.drawImage(cv, 0, 0, w, h);
-      const enc = A.jpegCmyk(w, h, lut, 80, 300);
-      for (let y = 0, n = 0; y < h; y += 8, n++) {
-        const rows = Math.min(8, h - y);
-        enc.band(x.getImageData(0, y, w, rows).data, rows);
-        if (n % 24 === 23) await wait(0);
+      const enc = A.jpegCmyk(w, h, lut, 80, dpi);
+      for (let y0 = 0; y0 < h; y0 += BAND) {
+        const bh = Math.min(BAND, h - y0);
+        x.fillStyle = '#ffffff';
+        x.fillRect(0, 0, w, BAND);
+        x.drawImage(cv, 0, -y0, w, h);
+        const data = x.getImageData(0, 0, w, bh).data;
+        for (let y = 0; y < bh; y += 8) enc.band(data.subarray(y * w * 4, (y + 8) * w * 4), Math.min(8, bh - y));
+        await wait(0);
       }
       return joinBytes(enc.finish());
     } catch (e) {
@@ -1235,6 +1275,7 @@
     const pdf = kinds.indexOf('pdf') >= 0; // к схеме и макету добавить PDF с точным размером листа
     const jpg = kinds.indexOf('jpg') >= 0; // макет ещё и в JPEG — так его берёт типография
     let scheme = null, cv = null;
+    exporting++;
     try {
       const under = underlay();
       if (kinds.indexOf('scheme') >= 0 || kinds.indexOf('layout') >= 0) scheme = A.renderScheme(res, cell, p.shape, -1, under);
@@ -1281,6 +1322,8 @@
     } finally {
       release(cv);
       release(scheme);
+      exporting--;
+      releaseRetired();
     }
     out.dpi = scheme ? dpiOf(cell, p) : 0; // 0 — печатное разрешение для этих файлов не важно
     return out;
@@ -1461,11 +1504,16 @@
 
   /* opt.keep — картинка открывается вместе с сохранённой работой: правки и кадр не сбрасываем;
    * opt.blob — исходный файл (для сохранения проекта); opt.id, opt.stored — картинка уже лежит в хранилище. */
+  let loadSeq = 0; // открывается только последняя выбранная картинка, даже если прежняя догрузится позже
+  function staleLoad() { const e = new Error('stale'); e.stale = true; return e; }
+
   function loadImage(src, name, isBlob, opt) {
     opt = opt || {};
+    const seq = ++loadSeq;
     return new Promise(function (resolve, reject) {
       const img = new Image();
       img.onload = function () {
+        if (seq !== loadSeq) { if (isBlob) URL.revokeObjectURL(src); reject(staleLoad()); return; }
         const iw = img.naturalWidth, ih = img.naturalHeight;
         if (!iw || !ih || iw * ih > MAX_IMAGE_PIXELS) {
           if (isBlob) URL.revokeObjectURL(src);
@@ -1485,8 +1533,9 @@
           reject(e);
           return;
         }
-        if (state.imgUrl) URL.revokeObjectURL(state.imgUrl); // прежняя картинка больше не нужна
         release(thumbCanvas);
+        try {
+        if (state.imgUrl && state.imgUrl !== src) URL.revokeObjectURL(state.imgUrl); // прежняя картинка больше не нужна
         state.raw = img;
         if (!opt.keep) state.tf = { rot: 0, flipX: false, flipY: false, tone: 'color' };
         if (state.brush.code === A.EMPTY) state.brush.code = null; // новая картинка — кисть снова красит цветом
@@ -1524,8 +1573,14 @@
         recompute();
         if (!batchRunning) setStep(opt.keep ? 4 : 2); // новая картинка — к размеру холста; сохранённая работа — сразу к правке
         resolve();
+        } catch (e) { // например, браузеру (iPad) не хватило памяти на холст — не оставляем страницу «занятой»
+          console.error(e);
+          setStatus(T('Не удалось прочитать эту картинку. Сохраните её как JPG или PNG и загрузите снова.'), 'error');
+          reject(e);
+        }
       };
       img.onerror = function () {
+        if (seq !== loadSeq) { if (isBlob) URL.revokeObjectURL(src); reject(staleLoad()); return; }
         if (isBlob) URL.revokeObjectURL(src);
         setStatus(T('Не удалось открыть файл. Подойдут JPG, PNG, WebP. Фото с iPhone в формате HEIC сначала сохраните как JPG.'), 'error');
         reject(new Error('image load failed'));
@@ -1695,6 +1750,7 @@
       });
     }
     state.paint = paint;
+    if (o.marks && typeof o.marks === 'object') { state.symbols.clear(); state.print.clear(); } // значки этой работы, а не общие
     readMarks(o.marks);
     storeMarks();
     normalizeInputs();
@@ -1795,7 +1851,7 @@
       if (!st || !(blob instanceof Blob)) throw new Error('нет работы');
       applyProjectData(st);
       return loadImage(URL.createObjectURL(blob), st.name, true, { keep: true, blob: blob, id: id });
-    }).catch(function () { setStatus(T('Не удалось открыть эту работу: её нет в памяти браузера.'), 'error'); });
+    }).catch(function (e) { if (!(e && e.stale)) setStatus(T('Не удалось открыть эту работу: её нет в памяти браузера.'), 'error'); });
   }
 
   function restoreWork() {
@@ -1857,6 +1913,7 @@
         setStatus(T('Проект открыт') + (o.name ? ' — ' + String(o.name).slice(0, 80) : '') + '.', 'ok');
       });
     }).catch(function (e) {
+      if (e && e.stale) return; // пока открывался проект, выбрали другую картинку
       console.error(e);
       setStatus(T('Не удалось открыть проект: файл повреждён или это не проект «Алмазной схемы».'), 'error');
     });
@@ -2253,7 +2310,8 @@
 
     document.querySelectorAll('[data-kind]').forEach(function (node) {
       const full = node.dataset.kind === 'full';
-      node.addEventListener('input', function () { schedule(full); });
+      const typing = node.tagName === 'TEXTAREA' || node.type === 'number' || node.type === 'text';
+      node.addEventListener('input', function () { schedule(full, typing); });
       node.addEventListener('change', function () {
         const before = $('wCm').value + '|' + $('hCm').value + '|' + $('gram').value;
         normalizeInputs();
