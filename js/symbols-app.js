@@ -4,7 +4,7 @@
   'use strict';
 
   const T = A.T, J = A.jpegEdit, S = A.layoutScan;
-  const VERSION = T('версия') + ' 25 · 17.11.2026';
+  const VERSION = T('версия') + ' 26 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // больше браузер не удержит вместе со всеми расчётами; на телефоне и планшете памяти меньше
   const PHONE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);

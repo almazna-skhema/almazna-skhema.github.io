@@ -116,13 +116,30 @@
     }
   }
 
-  /* Для подсветки одного цвета: остальные цвета становятся бледными. */
+  /* Подсветка одного цвета: его клетки заливаются яркой краской, которой нет в схеме, остальные
+   * не меняются — так этот цвет видно по всей картинке (как клавиша Q в программе Ольги). */
+  const HI_COLORS = [
+    { hex: '#00e5ff', name: 'бирюзовым' }, { hex: '#ff00cc', name: 'малиновым' },
+    { hex: '#66ff00', name: 'салатовым' }, { hex: '#ffe600', name: 'жёлтым' }
+  ];
+  function highlightColor(colors) {
+    let best = HI_COLORS[0], bestD = -1;
+    for (let k = 0; k < HI_COLORS.length; k++) {
+      const h = HI_COLORS[k].hex, r = parseInt(h.slice(1, 3), 16), g = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+      let d = Infinity;
+      colors.forEach(function (c) { d = Math.min(d, 0.3 * (c.r - r) * (c.r - r) + 0.59 * (c.g - g) * (c.g - g) + 0.11 * (c.b - b) * (c.b - b)); });
+      if (d >= 70 * 70) return Object.assign({ r: r, g: g, b: b }, HI_COLORS[k]); // далеко от всех цветов схемы — берём по порядку
+      if (d > bestD) { bestD = d; best = Object.assign({ r: r, g: g, b: b }, HI_COLORS[k]); }
+    }
+    return best;
+  }
+
   function withHighlight(colors, highlight) {
-    if (typeof highlight !== 'number' || highlight < 0) return colors;
+    if (typeof highlight !== 'number' || highlight < 0 || !colors[highlight]) return colors;
+    const h = highlightColor(colors);
     return colors.map(function (c, i) {
-      if (i === highlight) return c;
-      const r = Math.round(c.r + (255 - c.r) * 0.86), g = Math.round(c.g + (255 - c.g) * 0.86), b = Math.round(c.b + (255 - c.b) * 0.86);
-      return { r: r, g: g, b: b, hex: 'rgb(' + r + ',' + g + ',' + b + ')', symbol: c.symbol, dark: false, faint: true };
+      if (i !== highlight) return c;
+      return { r: h.r, g: h.g, b: h.b, hex: h.hex, symbol: c.symbol, dark: false, code: c.code };
     });
   }
 
@@ -809,6 +826,7 @@
   A.grams = grams;
   A.renderInsert = renderInsert;
   A.setSymbolScale = setSymbolScale;
+  A.highlightColor = highlightColor;
   A.renderLabels = renderLabels;
   A.INSERT_PX_PER_MM = INSERT_W / 210;
 })(window.ALMAZ = window.ALMAZ || {});

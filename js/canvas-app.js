@@ -4,8 +4,8 @@
   'use strict';
 
   const T = A.T;
-  const ASSET_VERSION = 25; // тот же номер, что в адресах скриптов в canvas.html
-  const VERSION = T('версия') + ' 25 · 17.11.2026';
+  const ASSET_VERSION = 26; // тот же номер, что в адресах скриптов в canvas.html
+  const VERSION = T('версия') + ' 26 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // телефоны и планшеты не держат большие холсты в памяти — там пределы скромнее
   const COARSE = !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;

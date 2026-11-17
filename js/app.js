@@ -4,8 +4,8 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const ASSET_VERSION = 25; // тот же номер, что в адресах скриптов в index.html
-  const VERSION = T('версия') + ' 25 · 17.11.2026';
+  const ASSET_VERSION = 26; // тот же номер, что в адресах скриптов в index.html
+  const VERSION = T('версия') + ' 26 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
@@ -556,7 +556,7 @@
     applyUi();
     const list = $('colorList');
     list.textContent = '';
-    const hi = highlightIndex();
+    const hi = highlightIndex(), hiLook = hi >= 0 ? A.highlightColor(res.colors) : null;
     const canExclude = res.colors.length > 2 && pal.items.length - state.excluded.size > 2;
     const brushOn = state.brush.on;
     let total = 0, totalG = 0;
@@ -578,6 +578,7 @@
       row.type = 'button';
       row.setAttribute('aria-pressed', (brushOn ? c.code === state.brush.code : i === hi) ? 'true' : 'false');
       row.title = brushOn ? T('Взять цвет ') + c.code + T(' на кисть') : T('Подсветить цвет ') + c.code + T(' на схеме');
+      if (i === hi) { row.classList.add('lit'); row.style.boxShadow = 'inset 5px 0 0 ' + hiLook.hex; } // подсвеченный цвет видно и в режиме кисти
       row.appendChild(el('span', 'code', c.code));
       row.appendChild(el('span', '', fmt(c.count)));
       row.appendChild(el('span', 'muted', g + T(' г')));
@@ -635,13 +636,16 @@
   }
 
   function toggleHighlight(code) {
+    if (!state.res || code === null || code === A.EMPTY) return;
     state.highlightCode = state.highlightCode === code ? null : code;
     dropCache(['mosaic', 'scheme']);
+    renderColorList();
     const hi = highlightIndex();
-    $('colorList').querySelectorAll('.color-row').forEach(function (row, i) {
-      row.setAttribute('aria-pressed', i === hi ? 'true' : 'false');
-    });
-    if (!paintTab()) selectTab('mosaic'); else showTab();
+    if (hi >= 0) {
+      const c = state.res.colors[hi], look = A.highlightColor(state.res.colors);
+      setStatus(T('Цвет ') + c.code + T(' подсвечен ') + T(look.name) + ': ' + fmt(c.count) + T(' страз. Нажмите ещё раз или клавишу Q, чтобы снять подсветку.'));
+    } else setStatus(T('Подсветка снята.'));
+    if (!paintTab()) selectTab('mosaic'); else { updateBrushBar(); showTab(); }
   }
 
   function excludeColor(code) {
@@ -829,6 +833,9 @@
     $('brushUndo').disabled = !state.undo.length;
     $('brushRedo').disabled = !state.redo.length;
     $('brushUnder').checked = b.under;
+    const lit = !none && state.highlightCode === it.code && highlightIndex() >= 0;
+    $('brushHi').setAttribute('aria-pressed', lit ? 'true' : 'false');
+    $('brushHi').disabled = none;
     $('brushClear').hidden = !paintFits();
     $('brushSize').value = String(b.size);
     document.querySelectorAll('input[name=tool]').forEach(function (r) { r.checked = r.value === b.tool; });
@@ -837,7 +844,6 @@
   function toggleBrush() {
     if (!state.res) return;
     state.brush.on = !state.brush.on;
-    if (state.brush.on && state.highlightCode !== null) { state.highlightCode = null; dropCache(['mosaic', 'scheme']); }
     renderColorList(); // подсказки и отметка в списке зависят от режима
     if (state.brush.on && ui.step !== 4) { setStep(4); return; } // кисть — часть этапа «Правка»
     if (state.brush.on && !paintTab()) selectTab('mosaic'); else { updateBrushBar(); showTab(); }
@@ -865,9 +871,11 @@
 
   function beginStroke() {
     const cv = $('holder').firstChild, it = brushItem();
+    // подсвеченный цвет и во время мазка рисуем контрастной краской, как он выглядит на схеме
+    const lit = state.highlightCode !== null && highlightIndex() >= 0 ? A.highlightColor(state.res.colors).hex : null;
     stroke = {
       changes: new Map(), ctx: cv.getContext('2d'), cell: cv.width / state.res.cols,
-      hex: it ? it.hex : '#ffffff', replace: replaceMap(), drag: false
+      hex: it ? (lit && it.code === state.highlightCode ? lit : it.hex) : '#ffffff', lit: lit, replace: replaceMap(), drag: false
     };
   }
 
@@ -879,7 +887,8 @@
     if (code === undefined) {
       cells.delete(i);
       const core = state.core, own = core.pal.items[core.sel[core.idx[i]]];
-      hex = ((stroke.replace && stroke.replace.get(own.code)) || own).hex;
+      const back = (stroke.replace && stroke.replace.get(own.code)) || own;
+      hex = stroke.lit && back.code === state.highlightCode ? stroke.lit : back.hex;
     } else cells.set(i, code);
     // сразу показываем мазок плоским цветом; точный вид появится, когда кнопку отпустят
     const s = stroke.cell;
@@ -2470,11 +2479,28 @@
       r.addEventListener('change', function () { if (r.checked) state.brush.tool = r.value; });
     });
     $('brushRedo').addEventListener('click', redoStroke);
+    $('brushHi').addEventListener('click', function () {
+      const code = state.brush.code;
+      if (code === null || code === A.EMPTY) return;
+      if (state.highlightCode !== code) state.highlightCode = null;
+      toggleHighlight(code);
+    });
     $('brushUnder').addEventListener('change', function (e) { state.brush.under = e.target.checked; showTab(); });
     document.addEventListener('keydown', function (e) {
       const t = e.target;
       if ((t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || document.querySelector('dialog[open]') || e.altKey) return;
       const key = String(e.key).toLowerCase(), mod = e.ctrlKey || e.metaKey;
+      if (!mod && !e.shiftKey && (key === 'q' || key === 'й')) { // подсветить цвет: в режиме кисти — цвет кисти
+        if (!state.res) return;
+        e.preventDefault();
+        if (state.brush.on && state.brush.code !== A.EMPTY) {
+          const code = state.brush.code;
+          if (state.highlightCode === code) toggleHighlight(code);
+          else { state.highlightCode = null; toggleHighlight(code); }
+        } else if (state.highlightCode !== null) toggleHighlight(state.highlightCode);
+        else setStatus(T('Чтобы подсветить цвет, нажмите на его номер в списке цветов.'));
+        return;
+      }
       if (!mod && !e.shiftKey && (key === 'v' || key === 'м')) { // сравнить с исходником
         if (!state.res) return;
         e.preventDefault();
