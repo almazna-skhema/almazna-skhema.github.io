@@ -6,8 +6,8 @@
   'use strict';
 
   const T = A.T, P = A.pngEdit, S = A.layoutScan, SI = A.schemeImport, OCR = A.schemeOcr;
-  const ASSET_VERSION = 29; // тот же номер, что в адресах скриптов в compose.html
-  const VERSION = T('версия') + ' 29 · 17.11.2026';
+  const ASSET_VERSION = 30; // тот же номер, что в адресах скриптов в compose.html
+  const VERSION = T('версия') + ' 30 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const MAX_PIXELS = 120e6, MAX_LOGOS = 4, LOGO_SIDE = 800, JPEG_MAX_PIXELS = 170e6;
   const PREVIEW_SIDE = 2400;
