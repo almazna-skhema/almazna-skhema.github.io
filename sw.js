@@ -4,7 +4,7 @@
  * При выпуске новой версии меняется VERSION — старое сохранённое удаляется. */
 'use strict';
 
-const VERSION = 30;
+const VERSION = 31;
 const CACHE = 'almaz-' + VERSION;
 const PAGES = ['./', 'index.html', 'canvas.html', 'symbols.html', 'compose.html'];
 const ASSETS = [

@@ -6,8 +6,8 @@
   'use strict';
 
   const T = A.T, P = A.pngEdit, S = A.layoutScan, SI = A.schemeImport, OCR = A.schemeOcr;
-  const ASSET_VERSION = 30; // тот же номер, что в адресах скриптов в compose.html
-  const VERSION = T('версия') + ' 30 · 17.11.2026';
+  const ASSET_VERSION = 31; // тот же номер, что в адресах скриптов в compose.html
+  const VERSION = T('версия') + ' 31 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const MAX_PIXELS = 120e6, MAX_LOGOS = 4, LOGO_SIDE = 800, JPEG_MAX_PIXELS = 170e6;
   const PREVIEW_SIDE = 2400;
@@ -189,6 +189,7 @@
       if (state.scheme) dropScheme();
       state.scheme = scheme;
       state.edits = new Map();
+      applyEdits(); // контрастная сетка — сразу, если включена
       // подписи в списке: строка легенды (квадратик и номер) или пример клетки
       state.crops = cl.classes.map(function (c) {
         if (c.legend >= 0) return legendThumb(bmp, rows[c.legend]);
@@ -310,13 +311,15 @@
   function applyEdits() {
     const sc = state.scheme;
     if (sc.image !== sc.pristine.image) { release(sc.image); sc.legend.forEach(function (r, i) { if (r.sq !== sc.pristine.legend[i].sq) release(r.sq); }); }
-    if (!state.edits.size) { sc.image = sc.pristine.image; sc.legend = sc.pristine.legend; return; }
+    const contrast = $('gridContrast').checked;
+    if (!state.edits.size && !contrast) { sc.image = sc.pristine.image; sc.legend = sc.pristine.legend; return; }
     const f = sc.dec.frame;
     if (!sc.work) sc.work = { frame: { width: f.width, height: f.height, hmax: 1, vmax: 1, comps: f.comps.map(function (c) { return Object.assign({}, c, { plane: new Uint8Array(c.plane.length) }); }) }, png: true, adobe: sc.dec.adobe };
     sc.work.frame.comps.forEach(function (c, i) { c.plane.set(f.comps[i].plane); });
     const edits = [];
     state.edits.forEach(function (sym, k) { edits.push({ k: k, symbol: sym }); });
-    S.applyEdits(sc.work, sc.scan, edits, A.symbolPicker.maskFor, { size: +$('size').value / 100, legend: true });
+    if (contrast) S.recolorGrid(sc.work, sc.scan); // сетка: чёрная на светлых клетках, белая на тёмных
+    if (edits.length) S.applyEdits(sc.work, sc.scan, edits, A.symbolPicker.maskFor, { size: +$('size').value / 100, legend: true });
     sc.image = planesCanvas(sc.work, sc.box);
     sc.legend = sc.pristine.legend.map(function (r, i) {
       const b = sc.sqBoxes[i];
@@ -759,6 +762,7 @@
       clearTimeout(state.sizeTimer);
       state.sizeTimer = setTimeout(function () { applyEdits(); render(); }, 200);
     });
+    $('gridContrast').addEventListener('change', function () { if (state.scheme) { applyEdits(); render(); } });
     $('resetAll').addEventListener('click', function () { state.edits.clear(); afterEdit(); });
     $('insertSave').addEventListener('click', saveInsert);
     $('labelsSave').addEventListener('click', saveLabels);

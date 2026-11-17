@@ -35,6 +35,14 @@
     return g;
   }
 
+  /* Яркость (0…255) цвета, записанного в составляющих файла, — по тем же правилам, что grayPlane. */
+  function lumOf(dec, v) {
+    const n = v.length, ycc = n === 3 && !(dec.adobe && dec.adobe.transform === 0);
+    if (n === 1 || ycc) return v[0];
+    if (n === 4) return dec.adobe && dec.adobe.transform === 2 ? (v[0] * v[3]) / 255 : ((0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) * v[3]) / 255;
+    return 0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2];
+  }
+
   function smooth(a, r) {
     const out = new Float64Array(a.length);
     let s = 0;
@@ -462,7 +470,7 @@
       const nb = t.bg.length, sum = new Float64Array(nb);
       feats.forEach(function (ft, i) { if (cells[i] !== k) return; n++; if (ft.lightGlyph) light++; for (let j = 0; j < nb; j++) sum[j] += ft.ink[j]; });
       ink = Array.from(sum, function (v) { return Math.round(v / Math.max(1, n)); });
-      return { bg: t.bg.map(Math.round), ink: ink, mask: t.mask, count: t.n, legend: legendOf[k], sample: sample[k], lightGlyph: light * 2 > n };
+      return { bg: t.bg.map(Math.round), ink: ink, mask: t.mask, count: t.n, legend: legendOf[k], sample: sample[k], lightGlyph: light * 2 > n, lum: Math.round(lumOf(dec, t.bg)) };
     });
     const nb = dec.frame.comps.length, cellBg = new Uint8Array(feats.length * nb);
     feats.forEach(function (ft, i) { for (let j = 0; j < nb; j++) cellBg[i * nb + j] = ft.bg[j]; });
@@ -545,5 +553,109 @@
     return { cells: cellsDone, blocks: blocks };
   }
 
-  A.layoutScan = { grayPlane: grayPlane, findGrid: findGrid, findLegend: findLegend, classify: classify, cellBox: cellBox, features: features, applyEdits: applyEdits };
+  /* ---------- контрастная сетка ----------
+   * Тонкие линии сетки перекрашиваются: между светлыми клетками — чёрные, между тёмными — белые
+   * (на границе светлой и тёмной — чёрные). Тёмная клетка — со светлым значком (так решила программа)
+   * или с фоном темнее середины (DARK_LINE): на таком фоне белая линия заметнее чёрной, даже если
+   * значок программа оставила чёрным. Жирные линии каждой десятой клетки (если они заметно толще)
+   * и внешняя рамка не трогаются. */
+  const DARK_LINE = 128;
+  function gridSegments(scan) {
+    const grid = scan.grid, cols = grid.cols, rows = grid.rows, cells = scan.cells, cl = scan.classes;
+    const t = grid.thin || 1, hasBold = grid.bold >= t + 2, ht = t / 2 + 0.5, hb = (hasBold ? grid.bold : t) / 2 + 0.5;
+    const skip = function (i, n) { return i === 0 || i === n || (hasBold && i % 10 === 0); };
+    const dark = function (i) { const c = cl[cells[i]]; return !!(c && (c.lightGlyph || c.lum < DARK_LINE)); };
+    const out = [];
+    // вертикальные: между столбцами i-1 и i; концы — до соседних горизонтальных линий (через тонкие — насквозь)
+    for (let i = 1; i < cols; i++) {
+      if (skip(i, cols)) continue;
+      const x0 = Math.ceil(grid.xs[i] - ht), x1 = Math.floor(grid.xs[i] + ht);
+      for (let r = 0; r < rows; r++) {
+        const y0 = skip(r, rows) ? Math.ceil(grid.ys[r] + hb) : Math.ceil(grid.ys[r] - ht);
+        const y1 = skip(r + 1, rows) ? Math.floor(grid.ys[r + 1] - hb) : Math.floor(grid.ys[r + 1] + ht);
+        out.push({ x0: x0, y0: y0, x1: x1, y1: y1, white: dark(r * cols + i - 1) && dark(r * cols + i) });
+      }
+    }
+    // горизонтальные: между строками j-1 и j (рисуются после — на перекрёстке решают они)
+    for (let j = 1; j < rows; j++) {
+      if (skip(j, rows)) continue;
+      const y0 = Math.ceil(grid.ys[j] - ht), y1 = Math.floor(grid.ys[j] + ht);
+      for (let c = 0; c < cols; c++) {
+        const x0 = skip(c, cols) ? Math.ceil(grid.xs[c] + hb) : Math.ceil(grid.xs[c] - ht);
+        const x1 = skip(c + 1, cols) ? Math.floor(grid.xs[c + 1] - hb) : Math.floor(grid.xs[c + 1] + ht);
+        out.push({ x0: x0, y0: y0, x1: x1, y1: y1, white: dark((j - 1) * cols + c) && dark(j * cols + c) });
+      }
+    }
+    return out;
+  }
+
+  /* Чёрный и белый в составляющих файла: RGB, YCbCr, CMYK Adobe (краски перевёрнуты, чёрный — только K). */
+  function gridInks(dec) {
+    const n = dec.frame.comps.length, t = dec.adobe ? dec.adobe.transform : -1;
+    if (n === 1) return { black: [0], white: [255] };
+    if (n === 3) return dec.png || t === 0 ? { black: [0, 0, 0], white: [255, 255, 255] } : { black: [0, 128, 128], white: [255, 128, 128] };
+    return t === 2 ? { black: [255, 128, 128, 0], white: [255, 128, 128, 255] } : { black: [255, 255, 255, 0], white: [255, 255, 255, 255] };
+  }
+
+  /* Перекрасить сетку в самом файле: в точках (PNG, dec.png) или в коэффициентах JPEG —
+   * по одному блоку 8×8 за раз, остальные блоки не трогаются. → { blocks } */
+  function recolorGrid(dec, scan) {
+    const f = dec.frame, W = f.width, H = f.height, J = A.jpegEdit, inks = gridInks(dec);
+    const mask = new Uint8Array(W * H); // 1 — чёрная линия, 2 — белая
+    gridSegments(scan).forEach(function (s) {
+      const v = s.white ? 2 : 1, x0 = Math.max(0, s.x0), x1 = Math.min(W - 1, s.x1), y0 = Math.max(0, s.y0), y1 = Math.min(H - 1, s.y1);
+      for (let y = y0; y <= y1; y++) mask.fill(v, y * W + x0, y * W + x1 + 1);
+    });
+    let blocks = 0;
+    f.comps.forEach(function (c, ci) {
+      const fx = Math.round(f.hmax / c.h) || 1, fy = Math.round(f.vmax / c.v) || 1, area = fx * fy, black = inks.black[ci], white = inks.white[ci];
+      /* Точка (u, v) составляющей: доля линии в её квадратике fx×fy полного разрешения. */
+      function mix(u, v, val) {
+        let nb = 0, nw = 0;
+        for (let yy = v * fy; yy < (v + 1) * fy && yy < H; yy++) for (let xx = u * fx; xx < (u + 1) * fx && xx < W; xx++) {
+          const m = mask[yy * W + xx];
+          if (m === 1) nb++; else if (m === 2) nw++;
+        }
+        if (!nb && !nw) return -1;
+        const a = (nb + nw) / area, to = nw > nb ? white : black;
+        return Math.round(val + a * (to - val));
+      }
+      if (!c.coefs) { // точки
+        const pw = c.pw, ph = Math.ceil(H / fy);
+        if (area === 1) {
+          for (let y = 0; y < H; y++) for (let x = 0, o = y * W, q = y * pw; x < W; x++) { const m = mask[o + x]; if (m) c.plane[q + x] = m === 2 ? white : black; }
+          return;
+        }
+        for (let v = 0; v < ph; v++) for (let u = 0; u < Math.ceil(W / fx); u++) {
+          const p = v * pw + u, r = mix(u, v, c.plane[p]);
+          if (r >= 0) c.plane[p] = r;
+        }
+        return;
+      }
+      const px = new Uint8Array(64);
+      for (let by = 0; by < c.bpc; by++) {
+        const Y0 = by * 8 * fy;
+        if (Y0 >= H) break;
+        for (let bx = 0; bx < c.bpl; bx++) {
+          const X0 = bx * 8 * fx;
+          if (X0 >= W) break;
+          // есть ли в блоке линия — сначала быстрая проверка по маске
+          let any = false;
+          for (let yy = Y0; yy < Math.min(H, Y0 + 8 * fy) && !any; yy++) for (let xx = X0, e = Math.min(W, X0 + 8 * fx), o = yy * W; xx < e; xx++) if (mask[o + xx]) { any = true; break; }
+          if (!any) continue;
+          const off = (by * c.bpl + bx) * 64;
+          J.idctBlock(c.coefs, off, c.q, px);
+          for (let k = 0; k < 64; k++) {
+            const r = mix(bx * 8 + (k & 7), by * 8 + (k >> 3), px[k]);
+            if (r >= 0) px[k] = r;
+          }
+          J.fdctBlock(px, c.q, c.coefs, off);
+          blocks++;
+        }
+      }
+    });
+    return { blocks: blocks };
+  }
+
+  A.layoutScan = { grayPlane: grayPlane, findGrid: findGrid, findLegend: findLegend, classify: classify, cellBox: cellBox, features: features, applyEdits: applyEdits, gridSegments: gridSegments, recolorGrid: recolorGrid };
 })(typeof window !== 'undefined' ? (window.ALMAZ = window.ALMAZ || {}) : module.exports);

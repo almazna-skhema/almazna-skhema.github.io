@@ -4,7 +4,7 @@
   'use strict';
 
   const T = A.T, J = A.jpegEdit, P = A.pngEdit, S = A.layoutScan;
-  const VERSION = T('версия') + ' 30 · 17.11.2026';
+  const VERSION = T('версия') + ' 31 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // больше браузер не удержит вместе со всеми расчётами; на телефоне и планшете памяти меньше
   const PHONE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -77,7 +77,19 @@
   function repaintPreview() {
     const p = state.preview, sc = state.scan, x = p.canvas.getContext('2d');
     x.putImageData(p.data, 0, 0);
-    if (!state.edits.size) { drawSelection(); return; }
+    if (state.edits.size) paintEdits(x, p, sc);
+    // контрастная сетка — те же отрезки, что и в файле, в масштабе просмотра
+    if ($('gridContrast').checked) {
+      const k = p.k;
+      S.gridSegments(sc).forEach(function (s) {
+        x.fillStyle = s.white ? '#ffffff' : '#000000';
+        x.fillRect(s.x0 * k, s.y0 * k, Math.max(1, (s.x1 - s.x0 + 1) * k), Math.max(1, (s.y1 - s.y0 + 1) * k));
+      });
+    }
+    drawSelection();
+  }
+
+  function paintEdits(x, p, sc) {
     const im = x.getImageData(0, 0, p.canvas.width, p.canvas.height), d = im.data, W = p.canvas.width, k = p.k;
     const size = +$('size').value / 100, grid = sc.grid, nb = sc.dec.frame.comps.length, cache = new Map();
     const paint = function (box, bgRgb, inkRgb, sym, frac) {
@@ -109,7 +121,6 @@
       }
     });
     x.putImageData(im, 0, 0);
-    drawSelection();
   }
 
   /* Подсветка клеток выбранного значка — отдельным слоем поверх макета. */
@@ -195,7 +206,7 @@
       }
       list.appendChild(li);
     });
-    $('save').disabled = !state.edits.size || state.busy;
+    $('save').disabled = !(state.edits.size || $('gridContrast').checked) || state.busy;
     $('resetAll').hidden = !state.edits.size;
   }
 
@@ -303,12 +314,13 @@
     $('empty').hidden = true;
     state.zoom = 1;
     applyZoom();
-    drawSelection();
+    repaintPreview(); // контрастная сетка, если включена
   }
 
   // ---------- сохранение ----------
   async function save() {
-    if (!state.bytes || !state.edits.size || state.busy) return;
+    const contrast = $('gridContrast').checked;
+    if (!state.bytes || !(state.edits.size || contrast) || state.busy) return;
     state.busy = true;
     $('save').disabled = true;
     setStatus(T('Меняю значки в файле…'));
@@ -320,7 +332,8 @@
       const sc = state.scan, png = state.png, step = function () { return wait(0); };
       const dec = png ? await P.decode(state.bytes, { onStep: step }) : J.decode(state.bytes);
       const scan = { grid: sc.grid, legend: sc.legend, classes: sc.classes, cells: sc.cells, cellBg: sc.cellBg, legendFeats: sc.legendFeats };
-      const r = S.applyEdits(dec, scan, edits, maskFor, opt);
+      if (contrast) S.recolorGrid(dec, scan); // сетка: чёрная на светлых клетках, белая на тёмных
+      const r = edits.length ? S.applyEdits(dec, scan, edits, maskFor, opt) : { cells: 0 };
       await wait(20);
       const parts = png ? await P.encode(dec, state.bytes, step) : J.encode(dec);
       const url = URL.createObjectURL(new Blob(parts, { type: png ? 'image/png' : 'image/jpeg' }));
@@ -329,7 +342,7 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
       state.saved = state.rev === rev;
-      setStatus(T('Сохранено: ') + state.name + T('. Перерисовано клеток: ') + fmt(r.cells) + T(', остальной файл не изменился.'), 'ok');
+      setStatus(T('Сохранено: ') + state.name + (contrast ? T('. Сетка перекрашена') + (r.cells ? T(', перерисовано клеток: ') + fmt(r.cells) : '') + T('; цвета и значки клеток не менялись.') : T('. Перерисовано клеток: ') + fmt(r.cells) + T(', остальной файл не изменился.')), 'ok');
     } catch (e) {
       console.error(e);
       setStatus(T('Не получилось сохранить: браузеру не хватило памяти.'), 'error');
@@ -451,6 +464,7 @@
     }
     $('size').addEventListener('input', function () { $('sizeOut').textContent = $('size').value + '%'; queueRepaint(); });
     $('inLegend').addEventListener('change', queueRepaint);
+    $('gridContrast').addEventListener('change', function () { if (!state.scan) return; changed(); renderRows(); queueRepaint(); });
     $('resetAll').addEventListener('click', function () { state.edits.clear(); afterEdit(); });
     $('save').addEventListener('click', save);
     A.symbolPicker.init(function () { return { scan: state.scan, edits: state.edits, crops: state.crops, size: +$('size').value / 100 }; },

@@ -290,16 +290,49 @@
     return cv;
   }
 
+  /* Тонкая сетка схемы: между светлыми клетками — чёрная линия, между тёмными — белая,
+   * иначе на светлых и тёмных цветах она сливается с клеткой. На границе светлой и тёмной
+   * клетки — чёрная. dark — тёмный ли цвет по номеру (null — все линии чёрные: у круглых
+   * страз между кружками белый фон). Соседние отрезки одного цвета рисуются одной полосой. */
+  function thinGrid(x, res, s, lw, dark) {
+    const cells = res.cells, cols = res.cols, rows = res.rows, E = A.EMPTY_CELL, off = lw >> 1;
+    function white(a, b) {
+      if (!dark) return false;
+      const da = a === E ? null : dark[a], db = b === E ? null : dark[b];
+      return da === null ? db === true : db === null ? da === true : da && db;
+    }
+    function line(n, along, cellAt, rect) {
+      for (let i = 1; i < n; i++) {
+        if (i % 10 === 0) continue;
+        let start = 0, cur = white(cellAt(i - 1, 0), cellAt(i, 0));
+        for (let k = 1; k <= along; k++) {
+          const w = k < along ? white(cellAt(i - 1, k), cellAt(i, k)) : !cur;
+          if (w === cur) continue;
+          x.fillStyle = cur ? '#ffffff' : '#000000';
+          rect(i * s - off, start * s, (k - start) * s);
+          start = k; cur = w;
+        }
+      }
+    }
+    // вертикальные линии: между столбцами i-1 и i, вдоль строк
+    line(cols, rows, function (c, r) { return cells[r * cols + c]; }, function (p, a, len) { x.fillRect(p, a, lw, len); });
+    // горизонтальные: между строками j-1 и j, вдоль столбцов
+    line(rows, cols, function (r, c) { return cells[r * cols + c]; }, function (p, a, len) { x.fillRect(a, p, len, lw); });
+  }
+
   function renderScheme(res, cellPx, shape, highlight, under) {
-    const s = cellPx;
-    const cv = drawCells(res, s, withHighlight(printed(res.colors), highlight).map(function (c) { return symbolSprite(c, s, shape); }), under);
+    const s = cellPx, colors = withHighlight(printed(res.colors), highlight);
+    const cv = drawCells(res, s, colors.map(function (c) { return symbolSprite(c, s, shape); }), under);
     const x = cv.getContext('2d'), W = cv.width, H = cv.height;
     if (s >= 6) {
       const big = s >= 16; // на мелком предпросмотре линии делаем легче, иначе они забивают картинку
       const lw = Math.max(1, Math.round(s / 30));
-      x.fillStyle = big ? '#8a8a8a' : 'rgba(0,0,0,0.22)';
-      for (let i = 1; i < res.cols; i++) if (i % 10) x.fillRect(i * s - (lw >> 1), 0, lw, H);
-      for (let j = 1; j < res.rows; j++) if (j % 10) x.fillRect(0, j * s - (lw >> 1), W, lw);
+      if (big) thinGrid(x, res, s, lw, shape === 'round' ? null : colors.map(function (c) { return !!c.dark; }));
+      else {
+        x.fillStyle = 'rgba(0,0,0,0.22)';
+        for (let i = 1; i < res.cols; i++) if (i % 10) x.fillRect(i * s - (lw >> 1), 0, lw, H);
+        for (let j = 1; j < res.rows; j++) if (j % 10) x.fillRect(0, j * s - (lw >> 1), W, lw);
+      }
       // каждая десятая линия — жирная, с белой подложкой, чтобы читалась на тёмном
       const bw = Math.max(1, Math.round(s * 0.08)), hw = bw + 2 * Math.max(1, Math.round(s * 0.035));
       (big ? [['#ffffff', hw], ['#000000', bw]] : [['#000000', bw]]).forEach(function (p) {
