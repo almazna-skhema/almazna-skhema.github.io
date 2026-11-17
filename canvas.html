@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="theme-color" content="#2f5bea">
-  <link rel="stylesheet" href="css/style.css?v=31">
+  <link rel="stylesheet" href="css/style.css?v=32">
 </head>
 <body class="poster">
   <svg class="sprite" aria-hidden="true">
@@ -46,31 +46,48 @@
       <a href="compose.html">Макет из схемы</a>
     </nav>
 
-    <nav class="stepper four" aria-label="Этапы работы">
+    <nav class="stepper six" aria-label="Этапы работы">
       <button type="button" data-go="1" aria-current="step"><span>1</span>Фото</button>
       <button type="button" data-go="2" disabled><span>2</span>Размер</button>
-      <button type="button" data-go="3" disabled><span>3</span>Обработка</button>
-      <button type="button" data-go="4" disabled><span>4</span>Файл</button>
+      <button type="button" data-go="3" disabled><span>3</span>Коллаж</button>
+      <button type="button" data-go="4" disabled><span>4</span>Эффекты</button>
+      <button type="button" data-go="5" disabled><span>5</span>Текст</button>
+      <button type="button" data-go="6" disabled><span>6</span>Файл</button>
     </nav>
 
     <div class="steps" id="steps">
       <section class="step" data-step="1">
-        <h2>Выберите фото</h2>
-        <p class="lead">Фото заказчика, из которого получится картина или постер.</p>
-        <input type="file" id="file" class="vh" accept="image/*" tabindex="-1" aria-hidden="true">
+        <h2>Фото</h2>
+        <p class="lead">Одно фото — картина, несколько — коллаж (до 20 фото). Порядок и раскладку можно поменять на шаге «Коллаж».</p>
+        <input type="file" id="file" class="vh" accept="image/*" multiple tabindex="-1" aria-hidden="true">
+        <input type="file" id="replaceFile" class="vh" accept="image/*" tabindex="-1" aria-hidden="true">
         <button type="button" class="drop" id="drop">
           <span class="drop-thumb" id="dropThumb" aria-hidden="true">＋</span>
           <span class="drop-text">
             <b id="dropTitle">Выбрать фото</b>
-            <small id="dropHint">или перетащите файл, или вставьте из буфера (Ctrl+V)</small>
+            <small id="dropHint">можно сразу несколько; или перетащите файлы, или вставьте из буфера (Ctrl+V)</small>
           </span>
         </button>
+        <div class="photo-list" id="photoList" hidden></div>
         <div class="image-tools" id="imageTools" hidden>
+          <p class="stats" id="photoSel"></p>
           <div class="row tight">
             <button type="button" class="icon" id="rotL" title="Повернуть влево" aria-label="Повернуть влево"><svg class="ic" aria-hidden="true"><use href="#i-rot-l"></use></svg></button>
             <button type="button" class="icon" id="rotR" title="Повернуть вправо" aria-label="Повернуть вправо"><svg class="ic" aria-hidden="true"><use href="#i-rot-r"></use></svg></button>
             <button type="button" class="icon" id="flipH" title="Отразить слева направо" aria-label="Отразить слева направо"><svg class="ic" aria-hidden="true"><use href="#i-flip-h"></use></svg></button>
             <button type="button" class="icon" id="flipV" title="Отразить сверху вниз" aria-label="Отразить сверху вниз"><svg class="ic" aria-hidden="true"><use href="#i-flip-v"></use></svg></button>
+            <button type="button" id="photoReplace" title="Поставить другое фото на это место">Заменить</button>
+            <button type="button" id="photoRemove" title="Убрать фото из работы">Убрать</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-info">
+            <b>Проект</b>
+            <small>Фото, коллаж, эффекты и надписи одним файлом — чтобы вернуться к заказу позже или на другом компьютере.</small>
+          </div>
+          <div class="card-actions">
+            <input type="file" id="projFile" class="vh" accept=".almaz,.json,application/json" tabindex="-1" aria-hidden="true">
+            <button type="button" id="projOpen">Открыть проект</button>
           </div>
         </div>
       </section>
@@ -106,10 +123,10 @@
           <button type="button" class="icon" id="swap" title="Повернуть холст" aria-label="Повернуть холст"><svg class="ic" aria-hidden="true"><use href="#i-swap"></use></svg></button>
           <label>Высота, см <input type="number" id="hCm" min="5" max="300" step="1" value="40"></label>
         </div>
-        <label>Приблизить фото <output id="zoomOut">100%</output>
+        <label><span id="zoomLabel">Приблизить фото</span> <output id="zoomOut">100%</output>
           <input type="range" id="zoom" min="100" max="400" value="100">
         </label>
-        <p class="hint">Двигайте фото мышью или пальцем прямо на макете, чтобы выбрать кадр. Масштаб — этим ползунком или колесом мыши с Ctrl.</p>
+        <p class="hint">Двигайте фото мышью или пальцем прямо на макете, чтобы выбрать кадр. Масштаб — этим ползунком или колесом мыши с Ctrl. В коллаже сначала нажмите на нужное фото.</p>
         <label>Торцы подрамника, см
           <input type="number" id="wrap" min="0" max="10" step="0.5" value="4">
         </label>
@@ -122,47 +139,158 @@
           </select>
         </label>
         <p class="hint">«Зеркало» сохраняет весь кадр на лицевой стороне. «Продолжение» загибает на торцы часть самого фото — важное у края окажется сбоку. «Один цвет» — ровная заливка.</p>
+        <p class="stats" id="wrapNote" hidden>Для коллажа и фото с полями «Продолжение фото» работает как зеркало.</p>
         <label class="inline" id="wrapColorRow" hidden>Цвет торцов <input type="color" id="wrapColor" value="#ffffff"></label>
       </section>
 
       <section class="step" data-step="3" hidden>
-        <h2>Обработка</h2>
-        <p class="lead">Свет, цвет и подпись. Этот шаг можно пропустить.</p>
-        <label>Яркость <output id="brightnessOut">0</output>
-          <input type="range" id="brightness" min="-50" max="50" value="0"></label>
-        <label>Контраст <output id="contrastOut">0</output>
-          <input type="range" id="contrast" min="-50" max="50" value="0"></label>
-        <label>Насыщенность <output id="saturationOut">0</output>
-          <input type="range" id="saturation" min="-100" max="100" value="0"></label>
-        <label>Тон
-          <select id="tone">
-            <option value="color">Цветная</option>
-            <option value="bw">Чёрно-белая</option>
-            <option value="sepia">Сепия</option>
-          </select>
-        </label>
-        <button type="button" class="link" id="resetAdjust">Сбросить обработку</button>
-        <details>
-          <summary>Подпись на картине</summary>
-          <label>Текст
-            <textarea id="caption" rows="2" maxlength="200" placeholder="Наша родина · літо 2026"></textarea>
-          </label>
-          <div class="row">
-            <label>Место
-              <select id="captionPos">
-                <option value="bottom">Внизу</option>
-                <option value="top">Вверху</option>
-                <option value="center">По центру</option>
-              </select>
-            </label>
-            <label class="inline">Цвет <input type="color" id="captionColor" value="#ffffff"></label>
+        <h2>Коллаж и поля</h2>
+        <p class="lead">Раскладка фото, промежутки между ними и поля по краю. Для одного фото поля — это рамка вокруг него, как паспарту.</p>
+        <div id="tplBox" hidden>
+          <span class="field-title">Раскладка</span>
+          <div class="tpl-list" id="tplList" role="group" aria-label="Раскладка"></div>
+          <div class="row tight">
+            <button type="button" id="cellPrev" title="Поменять выбранное фото местами с предыдущим">← Местами</button>
+            <span class="stats grow" id="cellInfo"></span>
+            <button type="button" id="cellNext" title="Поменять выбранное фото местами со следующим">Местами →</button>
           </div>
-          <label>Размер подписи <output id="captionSizeOut">6</output>
-            <input type="range" id="captionSize" min="2" max="16" value="6"></label>
-        </details>
+          <p class="hint">Нажмите на фото на макете, чтобы выбрать его: двигайте мышью, приближайте колесом с Ctrl. Кнопками «Местами» выбранное фото меняется с соседним.</p>
+        </div>
+        <label>Промежуток между фото, мм <output id="gapOut">10</output>
+          <input type="range" id="gap" min="0" max="60" step="1" value="10"></label>
+        <label>Поля по краю, мм <output id="marginOut">0</output>
+          <input type="range" id="margin" min="0" max="150" step="1" value="0"></label>
+        <label>Скругление углов фото, мм <output id="radiusOut">0</output>
+          <input type="range" id="radius" min="0" max="50" step="1" value="0"></label>
+        <label class="inline">Цвет фона, полей и промежутков <input type="color" id="bgColor" value="#ffffff"></label>
+        <p class="hint">Поля по краю считаются от сгиба: на торцы они уходят целиком, если выбрано «Зеркало». Промежуток 0 — фото встык.</p>
       </section>
 
       <section class="step" data-step="4" hidden>
+        <h2>Эффекты и цвет</h2>
+        <p class="lead">Художественный эффект и обработка ко всем фото сразу. Этот шаг можно пропустить.</p>
+        <span class="field-title">Художественный эффект</span>
+        <div class="fx-list" id="fxList" role="group" aria-label="Художественный эффект"></div>
+        <div id="fxControls" hidden>
+          <label id="fxSizeRow"><span id="fxSizeName">Размер мазка, мм</span> <output id="fxSizeOut">4</output>
+            <input type="range" id="fxSize" min="1" max="12" step="0.5" value="4"></label>
+          <label id="fxReliefRow"><span id="fxReliefName">Рельеф мазков</span> <output id="fxReliefOut">50</output>
+            <input type="range" id="fxRelief" min="0" max="100" value="50"></label>
+          <label>Сила эффекта, % <output id="fxAmountOut">100</output>
+            <input type="range" id="fxAmount" min="0" max="100" value="100"></label>
+          <p class="hint">Эффект считается заново после каждого изменения — на большом коллаже это занимает пару секунд. В файле для печати он рассчитывается в полном разрешении, поэтому сохранение дольше обычного.</p>
+        </div>
+        <details id="adjustBox" open>
+          <summary>Свет и цвет</summary>
+          <label class="check"><input type="checkbox" id="autoLevel"><span>Автокоррекция: выровнять свет и цвет каждого фото</span></label>
+          <label>Яркость <output id="brightnessOut">0</output>
+            <input type="range" id="brightness" min="-50" max="50" value="0"></label>
+          <label>Контраст <output id="contrastOut">0</output>
+            <input type="range" id="contrast" min="-50" max="50" value="0"></label>
+          <label>Насыщенность <output id="saturationOut">0</output>
+            <input type="range" id="saturation" min="-100" max="100" value="0"></label>
+          <label>Тепло <output id="warmthOut">0</output>
+            <input type="range" id="warmth" min="-50" max="50" value="0"></label>
+          <label>Резкость <output id="sharpOut">0</output>
+            <input type="range" id="sharp" min="0" max="100" value="0"></label>
+          <label>Виньетка (затемнение краёв) <output id="vignetteOut">0</output>
+            <input type="range" id="vignette" min="0" max="100" value="0"></label>
+          <label>Тон
+            <select id="tone">
+              <option value="color">Цветная</option>
+              <option value="bw">Чёрно-белая</option>
+              <option value="sepia">Сепия</option>
+              <option value="vintage">Винтаж</option>
+            </select>
+          </label>
+          <button type="button" class="link" id="resetAdjust">Сбросить эффект и обработку</button>
+        </details>
+      </section>
+
+      <section class="step" data-step="5" hidden>
+        <h2>Текст</h2>
+        <p class="lead">Надписи поверх фото: имена, даты, пожелания. Надпись можно двигать мышью прямо на макете, стрелками на клавиатуре — точно.</p>
+        <ul class="text-list" id="textList"></ul>
+        <button type="button" id="textAdd">＋ Добавить надпись</button>
+        <div class="text-editor" id="textEditor" hidden>
+          <label>Текст <textarea id="tText" rows="2" maxlength="300" placeholder="Анна та Олег · 12.06.2026"></textarea></label>
+          <span class="field-title">Стиль</span>
+          <div class="preset-row" id="tPresets">
+            <button type="button" data-preset="white" class="pr-white">Белый с тенью</button>
+            <button type="button" data-preset="black" class="pr-black">Чёрный</button>
+            <button type="button" data-preset="gold" class="pr-gold">Золото</button>
+            <button type="button" data-preset="silver" class="pr-silver">Серебро</button>
+            <button type="button" data-preset="outline" class="pr-outline">С контуром</button>
+            <button type="button" data-preset="plate" class="pr-plate">На подложке</button>
+          </div>
+          <label>Шрифт <select id="tFont"></select></label>
+          <input type="file" id="tFontFile" class="vh" accept=".ttf,.otf,.woff,.woff2" tabindex="-1" aria-hidden="true">
+          <button type="button" class="link" id="tFontAdd">Добавить свой шрифт из файла (TTF, OTF, WOFF)</button>
+          <label>Размер букв, см <output id="tSizeOut">4</output>
+            <input type="range" id="tSize" min="0.5" max="30" step="0.1" value="4"></label>
+          <div class="row tight">
+            <button type="button" class="toggle sq" id="tBold" aria-pressed="false" title="Жирный"><b>Ж</b></button>
+            <button type="button" class="toggle sq" id="tItalic" aria-pressed="false" title="Курсив"><i>К</i></button>
+            <div class="seg grow" role="group" aria-label="Выравнивание строк">
+              <label><input type="radio" name="tAlign" value="left"><span>Слева</span></label>
+              <label><input type="radio" name="tAlign" value="center" checked><span>По центру</span></label>
+              <label><input type="radio" name="tAlign" value="right"><span>Справа</span></label>
+            </div>
+          </div>
+          <div class="row">
+            <label>Заливка
+              <select id="tFill">
+                <option value="color">Цвет</option>
+                <option value="gold">Золото</option>
+                <option value="silver">Серебро</option>
+                <option value="rose">Розовое золото</option>
+              </select>
+            </label>
+            <label class="inline" id="tColorRow">Цвет <input type="color" id="tColor" value="#ffffff"></label>
+          </div>
+          <label>Непрозрачность, % <output id="tOpacityOut">100</output>
+            <input type="range" id="tOpacity" min="10" max="100" value="100"></label>
+          <details>
+            <summary>Тень</summary>
+            <div class="row tight"><label class="check grow"><input type="checkbox" id="tShadow"><span>Тень под буквами</span></label><input type="color" id="tShadowColor" value="#000000" title="Цвет тени"></div>
+            <label>Плотность, % <output id="tShadowAlphaOut">60</output><input type="range" id="tShadowAlpha" min="5" max="100" value="60"></label>
+            <label>Размытие, мм <output id="tShadowBlurOut">1.5</output><input type="range" id="tShadowBlur" min="0" max="15" step="0.1" value="1.5"></label>
+            <label>Сдвиг вправо, мм <output id="tShadowDxOut">0.5</output><input type="range" id="tShadowDx" min="-10" max="10" step="0.1" value="0.5"></label>
+            <label>Сдвиг вниз, мм <output id="tShadowDyOut">0.7</output><input type="range" id="tShadowDy" min="-10" max="10" step="0.1" value="0.7"></label>
+          </details>
+          <details>
+            <summary>Контур</summary>
+            <div class="row tight"><label class="check grow"><input type="checkbox" id="tOutline"><span>Контур вокруг букв</span></label><input type="color" id="tOutlineColor" value="#000000" title="Цвет контура"></div>
+            <label>Толщина, мм <output id="tOutlineWidthOut">0.6</output><input type="range" id="tOutlineWidth" min="0.1" max="5" step="0.1" value="0.6"></label>
+          </details>
+          <details>
+            <summary>Подложка</summary>
+            <div class="row tight"><label class="check grow"><input type="checkbox" id="tPlate"><span>Плашка под текстом</span></label><input type="color" id="tPlateColor" value="#ffffff" title="Цвет плашки"></div>
+            <label>Плотность, % <output id="tPlateAlphaOut">80</output><input type="range" id="tPlateAlpha" min="5" max="100" value="80"></label>
+            <label>Отступ, мм <output id="tPlatePadOut">6</output><input type="range" id="tPlatePad" min="0" max="40" step="0.5" value="6"></label>
+            <label>Скругление, мм <output id="tPlateRadiusOut">3</output><input type="range" id="tPlateRadius" min="0" max="40" step="0.5" value="3"></label>
+          </details>
+          <details>
+            <summary>Расположение и интервалы</summary>
+            <div class="row tight wrap">
+              <button type="button" id="tCenterX">По центру</button>
+              <button type="button" id="tTop">Вверху</button>
+              <button type="button" id="tMiddle">Посередине</button>
+              <button type="button" id="tBottom">Внизу</button>
+            </div>
+            <label>Поворот, ° <output id="tRotOut">0</output><input type="range" id="tRot" min="-180" max="180" value="0"></label>
+            <label>Между буквами, % <output id="tSpacingOut">0</output><input type="range" id="tSpacing" min="-10" max="60" value="0"></label>
+            <label>Между строками <output id="tLineHOut">1.15</output><input type="range" id="tLineH" min="0.7" max="2.5" step="0.05" value="1.15"></label>
+          </details>
+          <p class="quality warn" id="tWarn" hidden></p>
+          <div class="row tight">
+            <button type="button" id="tDup">Копия надписи</button>
+            <button type="button" class="link danger" id="tDel">Удалить надпись</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="step" data-step="6" hidden>
         <h2>Файл для печати</h2>
         <p class="lead">Готовый макет одним файлом, с торцами и в нужном разрешении.</p>
         <label>Номер заказа или название
@@ -177,6 +305,22 @@
         </label>
         <p class="hint">CMYK — как в файлах для типографии (мелованная бумага, FOGRA39). RGB берут, если печатник просит обычный JPEG.</p>
         <p class="stats" id="fileInfo"></p>
+        <ul class="checks" id="checks"></ul>
+        <div class="card">
+          <div class="card-info">
+            <b>Превью для заказчика</b>
+            <small>Картина на стене рядом с человеком — небольшой JPG, чтобы согласовать заказ в мессенджере.</small>
+          </div>
+          <label class="check"><input type="checkbox" id="watermark" checked><span>Надпись «ОБРАЗЕЦ» поверх картины</span></label>
+          <div class="card-actions"><button type="button" id="previewSave">Скачать превью</button></div>
+        </div>
+        <div class="card">
+          <div class="card-info">
+            <b>Проект</b>
+            <small>Сохраните, чтобы потом поправить заказ: фото, коллаж, эффекты и надписи.</small>
+          </div>
+          <div class="card-actions"><button type="button" id="projSave">Сохранить проект</button></div>
+        </div>
       </section>
     </div>
 
@@ -200,13 +344,14 @@
         <button role="tab" data-tab="wall" aria-selected="false">На стене</button>
       </div>
       <div class="tools">
+        <span class="busy-note" id="fxBusy" hidden>Рисую эффект…</span>
         <button type="button" class="toggle" id="saveTop" aria-pressed="true" disabled title="Скачать файл для печати"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>Скачать</span></button>
       </div>
     </nav>
     <div class="stage" id="stage">
       <div class="empty" id="empty">
         <h3>Перетащите сюда фото</h3>
-        <p>Сервис подготовит макет для печати на холсте или постере: кадр, торцы подрамника и файл в нужном разрешении.</p>
+        <p>Сервис подготовит макет для печати на холсте или постере: кадр, коллаж из нескольких фото, художественные эффекты, надписи, торцы подрамника и файл в нужном разрешении.</p>
         <button type="button" class="primary" id="emptyPick">Выбрать фото</button>
         <small>Подойдут JPG, PNG, WebP. Фото обрабатывается в вашем браузере и никуда не отправляется.</small>
       </div>
@@ -216,10 +361,13 @@
 
   <div class="tip" id="tip" role="tooltip" hidden></div>
 
-  <script src="js/i18n.js?v=31"></script>
-  <script src="js/files.js?v=31"></script>
-  <script src="js/engine.js?v=31"></script>
-  <script src="js/canvas-app.js?v=31"></script>
-  <script src="js/pwa.js?v=31"></script>
+  <script src="js/i18n.js?v=32"></script>
+  <script src="js/files.js?v=32"></script>
+  <script src="js/engine.js?v=32"></script>
+  <script src="js/canvas-collage.js?v=32"></script>
+  <script src="js/canvas-text.js?v=32"></script>
+  <script src="js/canvas-fx.js?v=32"></script>
+  <script src="js/canvas-app.js?v=32"></script>
+  <script src="js/pwa.js?v=32"></script>
 </body>
 </html>

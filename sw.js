@@ -4,12 +4,12 @@
  * При выпуске новой версии меняется VERSION — старое сохранённое удаляется. */
 'use strict';
 
-const VERSION = 31;
+const VERSION = 32;
 const CACHE = 'almaz-' + VERSION;
 const PAGES = ['./', 'index.html', 'canvas.html', 'symbols.html', 'compose.html'];
 const ASSETS = [
   'css/style.css', 'js/i18n.js', 'js/palette-dmc.js', 'js/files.js', 'js/engine.js', 'js/render.js', 'js/app.js',
-  'js/canvas-app.js', 'js/cmyk-lut.js', 'js/jpeg-edit.js', 'js/png-edit.js', 'js/layout-scan.js', 'js/scheme-import.js',
+  'js/canvas-app.js', 'js/canvas-collage.js', 'js/canvas-text.js', 'js/canvas-fx.js', 'js/cmyk-lut.js', 'js/jpeg-edit.js', 'js/png-edit.js', 'js/layout-scan.js', 'js/scheme-import.js',
   'js/scheme-ocr.js', 'js/symbol-picker.js', 'js/symbols-app.js', 'js/compose-app.js', 'js/pwa.js'
 ].map(function (f) { return f + '?v=' + VERSION; });
 const OTHER = ['manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
