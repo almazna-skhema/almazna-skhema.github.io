@@ -5,13 +5,14 @@
 (function (A) {
   'use strict';
 
-  const T = A.T, P = A.pngEdit, S = A.layoutScan, SI = A.schemeImport;
-  const ASSET_VERSION = 28; // тот же номер, что в адресах скриптов в compose.html
-  const VERSION = T('версия') + ' 28 · 17.11.2026';
+  const T = A.T, P = A.pngEdit, S = A.layoutScan, SI = A.schemeImport, OCR = A.schemeOcr;
+  const ASSET_VERSION = 29; // тот же номер, что в адресах скриптов в compose.html
+  const VERSION = T('версия') + ' 29 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const MAX_PIXELS = 120e6, MAX_LOGOS = 4, LOGO_SIDE = 800, JPEG_MAX_PIXELS = 170e6;
   const PREVIEW_SIDE = 2400;
-  const state = { scheme: null, photo: null, photoName: '', logos: [], busy: false, zoom: 1, preview: null, timer: null, edits: new Map(), crops: [], order: [] };
+  const state = { scheme: null, photo: null, photoName: '', logos: [], busy: false, zoom: 1, preview: null, timer: null, edits: new Map(), crops: [], order: [],
+    tab: 'sheet', sel: -1, insert: null, overlay: null };
 
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -194,12 +195,20 @@
         const i = c.sample, cx = i % grid.cols, cy = Math.floor(i / grid.cols);
         return thumb(bmp, { x0: Math.round(grid.xs[cx]), y0: Math.round(grid.ys[cy]), x1: Math.round(grid.xs[cx + 1]), y1: Math.round(grid.ys[cy + 1]) }, 0);
       });
+      // номера и значки текстом — для вкладыша и этикеток (проверяет пользователь)
+      scheme.ocr = OCR ? OCR.read(bmp, rows) : rows.map(function () { return { code: '', symbol: '', sure: false, symSure: false }; });
+      scheme.rowThumbs = rows.map(function (r) { return legendThumb(bmp, r); });
+      scheme.classOf = rows.map(function () { return -1; });
+      cl.classes.forEach(function (c, k) { if (c.legend >= 0) scheme.classOf[c.legend] = k; });
+      state.sel = -1;
       state.order = cl.classes.map(function (c, k) { return k; }).sort(function (a, b) {
         const la = cl.classes[a].legend, lb = cl.classes[b].legend;
         return (la < 0 ? 1e6 + a : la) - (lb < 0 ? 1e6 + b : lb);
       });
       $('symbolsStep').hidden = false;
+      $('kitStep').hidden = false;
       renderRows();
+      renderKit();
       const wCm = Math.round((grid.cols * pitchMm) / 10), hCm = Math.round((grid.rows * pitchMm) / 10);
       $('fileInfo').hidden = false;
       $('fileInfo').textContent = file.name + ' · ' + grid.cols + ' × ' + grid.rows + ' ' + T('страз') + ' · ' + wCm + ' × ' + hCm + ' ' + T('см') + ' · ' + legend.length + ' ' + T('цветов');
@@ -257,6 +266,7 @@
     state.order.forEach(function (k) {
       const c = sc.scan.classes[k], li = el('li'), row = el('button', 'sym-row');
       row.type = 'button';
+      row.setAttribute('aria-pressed', state.sel === k ? 'true' : 'false');
       const th = el('span', 'row-thumb');
       th.appendChild(state.crops[k].cloneNode());
       row.appendChild(th);
@@ -266,7 +276,7 @@
       row.appendChild(info);
       const sym = state.edits.get(k);
       row.appendChild(el('span', 'row-target' + (sym ? ' set' : ''), sym ? '→ ' + sym.replace(/︎/g, '') : '→ …'));
-      row.addEventListener('click', function () { A.symbolPicker.open(k); });
+      row.addEventListener('click', function () { select(k, true); A.symbolPicker.open(k); });
       li.appendChild(row);
       if (sym) {
         const x = el('button', 'color-x');
@@ -317,6 +327,7 @@
   function afterEdit() {
     renderRows();
     applyEdits();
+    renderKit();
     schedule();
     const n = state.edits.size;
     setStatus(n ? T('Заменено значков: ') + n + T('. Сохраните JPEG для типографии, когда всё готово.') : T('Значки как в программе. Нажмите на значок в списке, чтобы заменить его.'));
@@ -365,22 +376,217 @@
     } finally { if (img !== sc.image) release(img); }
   }
 
+  /* Лист, вкладыш — пересобираем; схема показывается как есть, в полном размере. */
   function render() {
     if (!state.scheme) return;
     const sc = state.scheme, k = Math.min(1, PREVIEW_SIDE / ((sc.image.height / sc.rows) * (sc.rows + 2 * 50 / sc.pitchMm)));
-    const cv = sheet(k).canvas, holder = $('holder'), old = state.preview;
+    const old = state.preview;
+    state.preview = sheet(k).canvas;
+    const oldIns = state.insert;
+    state.insert = insertCanvas(0.5);
+    showView();
+    if (old !== state.preview) release(old);
+    if (oldIns !== state.insert) release(oldIns);
+  }
+
+  function showView() {
+    const sc = state.scheme, holder = $('holder'), stage = $('stage');
+    if (!sc) return;
+    const cv = state.tab === 'scheme' ? sc.image : state.tab === 'insert' ? state.insert : state.preview;
+    const old = holder.firstChild, sl = stage.scrollLeft, st = stage.scrollTop;
+    const same = old && old.width === cv.width && old.height === cv.height && old.dataset.tab === state.tab;
     cv.className = '';
-    if (old && old.width === cv.width && old.height === cv.height) { cv.style.width = old.style.width; cv.style.height = old.style.height; }
-    holder.replaceChildren ? holder.replaceChildren(cv) : (holder.textContent = '', holder.appendChild(cv));
-    release(old);
-    state.preview = cv;
+    cv.dataset.tab = state.tab;
+    if (same) { cv.style.width = old.style.width; cv.style.height = old.style.height; }
+    const kids = [cv];
+    if (state.tab === 'scheme') { drawSelection(); kids.push(state.overlay); }
+    if (old !== cv || holder.children.length !== kids.length) {
+      if (holder.replaceChildren) holder.replaceChildren.apply(holder, kids);
+      else { holder.textContent = ''; kids.forEach(function (n) { holder.appendChild(n); }); }
+    }
     holder.hidden = false;
     $('empty').hidden = true;
     applyZoom();
+    if (same) { stage.scrollLeft = sl; stage.scrollTop = st; }
+  }
+
+  function selectTab(tab) {
+    if (tab === state.tab) return;
+    state.tab = tab;
+    state.zoom = 1;
+    document.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'); });
+    showView();
+  }
+
+  /* Клетки выбранного значка обводим рамкой — соседние клетки остаются видны, чтобы сравнить. */
+  const OV = 0.5;
+  function drawSelection() {
+    const sc = state.scheme;
+    if (!sc) return;
+    let ov = state.overlay;
+    const w = Math.round(sc.image.width * OV), h = Math.round(sc.image.height * OV);
+    if (!ov) { ov = state.overlay = A.makeCanvas(w, h); }
+    if (ov.width !== w || ov.height !== h) { ov.width = w; ov.height = h; }
+    ov.className = 'overlay';
+    const x = ov.getContext('2d');
+    x.clearRect(0, 0, w, h);
+    if (state.sel < 0) return;
+    const scan = sc.scan, g = scan.grid, x0 = sc.box.x0, y0 = sc.box.y0;
+    x.strokeStyle = '#ff2d7a';
+    x.lineWidth = 2;
+    for (let i = 0; i < scan.cells.length; i++) {
+      if (scan.cells[i] !== state.sel) continue;
+      const cx = i % g.cols, cy = Math.floor(i / g.cols);
+      x.strokeRect((g.xs[cx] - x0) * OV + 1, (g.ys[cy] - y0) * OV + 1, g.pitch * OV - 2, g.pitch * OV - 2);
+    }
+  }
+
+  /* Увеличить схему на первой клетке выбранного значка. */
+  function focusSel() {
+    const sc = state.scheme, stage = $('stage');
+    if (!sc || state.sel < 0 || state.tab !== 'scheme') return;
+    const scan = sc.scan, g = scan.grid, i = scan.cells.indexOf(state.sel);
+    if (i < 0) return;
+    state.zoom = clamp(12 * (sc.image.height / g.pitch) / 200, 3, 6); // видно новые значки и соседей вокруг
+    applyZoom();
+    const cv = $('holder').firstChild, r = cv.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const cx = ((g.xs[i % g.cols] - sc.box.x0 + g.pitch / 2) / cv.width) * r.width, cy = ((g.ys[Math.floor(i / g.cols)] - sc.box.y0 + g.pitch / 2) / cv.height) * r.height;
+    stage.scrollLeft += r.left + cx - (sr.left + sr.width / 2);
+    stage.scrollTop += r.top + cy - (sr.top + sr.height / 2);
+  }
+
+  function select(k, keep) {
+    state.sel = keep ? k : (state.sel === k ? -1 : k);
+    renderRows();
+    if (state.tab === 'scheme') drawSelection();
   }
   function schedule() {
     clearTimeout(state.timer);
     state.timer = setTimeout(render, 250);
+  }
+
+  // ---------- вкладыш и этикетки ----------
+  function renderKit() {
+    const sc = state.scheme, list = $('kitRows');
+    list.textContent = '';
+    if (!sc) return;
+    sc.ocr.forEach(function (o, j) {
+      const k = sc.classOf[j], li = el('li'), th = el('span', 'row-thumb');
+      th.appendChild(sc.rowThumbs[j].cloneNode());
+      li.appendChild(th);
+      const code = el('input', o.sure ? '' : 'unsure');
+      code.type = 'text';
+      code.maxLength = 8;
+      code.value = o.code;
+      code.title = T('Номер цвета DMC');
+      code.setAttribute('aria-label', code.title);
+      code.addEventListener('input', function () { o.code = code.value.trim(); o.sure = true; code.className = ''; scheduleInsert(); });
+      li.appendChild(code);
+      const fixed = k >= 0 ? state.edits.get(k) : null;
+      if (fixed) {
+        const f = el('span', 'sym fixed', fixed.replace(/︎/g, ''));
+        f.title = T('Новый значок');
+        li.appendChild(f);
+      } else {
+        const sym = el('input', 'sym' + (o.symSure ? '' : ' unsure'));
+        sym.type = 'text';
+        sym.maxLength = 2;
+        sym.value = o.symbol;
+        sym.title = T('Значок на схеме');
+        sym.setAttribute('aria-label', sym.title);
+        sym.addEventListener('input', function () { o.symbol = sym.value.trim(); o.symSure = true; sym.className = 'sym'; scheduleInsert(); });
+        li.appendChild(sym);
+      }
+      list.appendChild(li);
+    });
+    $('insertSave').disabled = $('labelsSave').disabled = false;
+  }
+
+  /* Значки программы, прочитанные из легенды: значок → позначка (их нельзя дать другому цвету). */
+  function usedSymbols() {
+    const sc = state.scheme, m = new Map();
+    if (sc) sc.ocr.forEach(function (o, j) { if (o.symbol && sc.classOf[j] >= 0) m.set(o.symbol, sc.classOf[j]); });
+    return m;
+  }
+
+  function hex2(v) { v = clamp(Math.round(v), 0, 255); return (v < 16 ? '0' : '') + v.toString(16); }
+
+  /* Цвета в порядке легенды программы: номер, значок (новый или прочитанный), число страз, цвет, квадратик. */
+  function kitColors() {
+    const sc = state.scheme, out = [];
+    sc.ocr.forEach(function (o, j) {
+      const k = sc.classOf[j];
+      if (k < 0) return; // строка легенды без клеток на схеме
+      const c = sc.scan.classes[k], r = c.bg[0], g = c.bg[1], b = c.bg[2];
+      out.push({ code: o.code || '?', symbol: state.edits.get(k) || o.symbol || '?', count: c.count, r: r, g: g, b: b,
+        hex: '#' + hex2(r) + hex2(g) + hex2(b), dark: 0.299 * r + 0.587 * g + 0.114 * b < 128, symImage: sc.legend[j].sq });
+    });
+    return out;
+  }
+
+  function insertCanvas(K) {
+    const sc = state.scheme, m = meta(), st = readSettings();
+    m.insertStyle = st.insertStyle === 'table' ? 'table' : 'list'; // как выбрано в «Алмазной схеме»
+    return A.renderInsert({ cols: sc.cols, rows: sc.rows, colors: kitColors() }, m, state.photo || sc.cells, K);
+  }
+  function scheduleInsert() {
+    clearTimeout(state.insTimer);
+    state.insTimer = setTimeout(function () {
+      if (!state.scheme) return;
+      const old = state.insert;
+      state.insert = insertCanvas(0.5);
+      if (state.tab === 'insert') showView();
+      release(old);
+    }, 300);
+  }
+
+  function baseName() {
+    const clean = function (s) { return String(s || '').replace(/[\u0000-\u001f\\/:*?"<>|]+/g, ' ').replace(/^[\s.]+/, '').trim().slice(0, 80); };
+    return clean([$('article').value.trim(), $('title').value.trim()].filter(Boolean).join(' ')) || clean(state.scheme.name.replace(/\.[^.]+$/, ''));
+  }
+
+  function download(parts, name, type) {
+    const url = URL.createObjectURL(new Blob(parts, { type: type }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  }
+
+  function unsureCount() {
+    return state.scheme.ocr.filter(function (o, j) { return !o.sure || (!o.symSure && !state.edits.has(state.scheme.classOf[j])); }).length;
+  }
+
+  async function saveInsert() {
+    if (!state.scheme || state.busy) return;
+    state.busy = true;
+    let cv = null;
+    try {
+      cv = insertCanvas(1);
+      const blob = await new Promise(function (resolve) { cv.toBlob(resolve, 'image/png'); });
+      if (!blob) throw new Error('png');
+      const bytes = A.pngSetDpi(new Uint8Array(await blob.arrayBuffer()), A.INSERT_PX_PER_MM);
+      const name = T('Вкладыш') + ' ' + baseName() + '.png';
+      download([bytes], name, 'image/png');
+      const u = unsureCount();
+      setStatus(T('Сохранено: ') + name + (u ? ' · ' + T('проверьте строки, выделенные жёлтым: ') + u : ''), u ? '' : 'ok');
+    } catch (e) {
+      console.error(e);
+      setStatus(T('Не получилось сохранить: браузеру не хватило памяти. Попробуйте на компьютере.'), 'error');
+    } finally { release(cv); state.busy = false; }
+  }
+
+  function saveLabels() {
+    if (!state.scheme || state.busy) return;
+    const st = readSettings(), reserve = clamp(parseInt(st.reserve, 10) || 0, 0, 50), k = 1 + reserve / 100;
+    const parts = A.labelsDocx({
+      article: $('article').value.trim(), title: $('title').value.trim(), unit: T('шт'),
+      rows: kitColors().map(function (c) { return { symbol: c.symbol, code: c.code, count: Math.ceil(c.count * k) }; })
+    });
+    const name = T('Этикетки') + ' ' + baseName() + '.docx';
+    download(parts, name, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    const u = unsureCount();
+    setStatus(T('Сохранено: ') + name + (reserve ? ' · ' + T('с запасом ') + reserve + '%' : '') + (u ? ' · ' + T('проверьте строки, выделенные жёлтым: ') + u : ''), u ? '' : 'ok');
   }
 
   // ---------- сохранение ----------
@@ -467,11 +673,25 @@
     const cv = $('holder').firstChild, stage = $('stage');
     if (!cv) return;
     const fit = Math.max(0.02, Math.min((stage.clientWidth - 40) / cv.width, (stage.clientHeight - 40) / cv.height)), s = fit * state.zoom;
-    cv.style.width = Math.round(cv.width * s) + 'px';
-    cv.style.height = Math.round(cv.height * s) + 'px';
+    Array.prototype.forEach.call($('holder').children, function (n) {
+      n.style.width = Math.round(cv.width * s) + 'px';
+      n.style.height = Math.round(cv.height * s) + 'px';
+    });
     $('zoomLabel').textContent = Math.round(state.zoom * 100) + '%';
   }
-  function setZoom(z) { state.zoom = clamp(z, 0.5, 12); applyZoom(); }
+  /* Масштаб вокруг точки (курсора или середины экрана): то, что под ней, остаётся на месте. */
+  function setZoom(z, cx, cy) {
+    const cv = $('holder').firstChild, stage = $('stage');
+    if (!cv) return;
+    z = clamp(z, 0.5, state.tab === 'insert' ? 6 : 24);
+    const sr = stage.getBoundingClientRect(), px = cx === undefined ? sr.left + sr.width / 2 : cx, py = cy === undefined ? sr.top + sr.height / 2 : cy;
+    const r0 = cv.getBoundingClientRect(), fx = (px - r0.left) / r0.width, fy = (py - r0.top) / r0.height;
+    state.zoom = z;
+    applyZoom();
+    const r1 = cv.getBoundingClientRect();
+    stage.scrollLeft += r1.left + fx * r1.width - px;
+    stage.scrollTop += r1.top + fy * r1.height - py;
+  }
 
   function setupHints() {
     const tip = $('tip');
@@ -527,8 +747,12 @@
     document.addEventListener('dragover', function (e) { e.preventDefault(); });
     document.addEventListener('drop', function (e) { e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); });
     ['article', 'title'].forEach(function (id) { $(id).addEventListener('input', schedule); });
-    A.symbolPicker.init(function () { return { scan: state.scheme.scan, edits: state.edits, crops: state.crops, size: +$('size').value / 100 }; },
-      function (k, sym) { if (sym) state.edits.set(k, sym); else state.edits.delete(k); afterEdit(); });
+    A.symbolPicker.init(function () { return { scan: state.scheme.scan, edits: state.edits, crops: state.crops, size: +$('size').value / 100, used: usedSymbols() }; },
+      function (k, sym) {
+        if (sym) state.edits.set(k, sym); else state.edits.delete(k);
+        afterEdit();
+        if (sym) { state.sel = k; selectTab('scheme'); focusSel(); } // сразу показать новые значки крупно
+      });
     $('size').addEventListener('input', function () {
       $('sizeOut').textContent = $('size').value + '%';
       if (!state.scheme || !state.edits.size) return;
@@ -536,6 +760,8 @@
       state.sizeTimer = setTimeout(function () { applyEdits(); render(); }, 200);
     });
     $('resetAll').addEventListener('click', function () { state.edits.clear(); afterEdit(); });
+    $('insertSave').addEventListener('click', saveInsert);
+    $('labelsSave').addEventListener('click', saveLabels);
     $('urls').addEventListener('input', function () { saveUrls(); schedule(); });
     $('logoPick').addEventListener('click', function () { $('logoFile').click(); });
     $('logoFile').addEventListener('change', function (e) {
@@ -554,6 +780,27 @@
       $('panelToggle').setAttribute('aria-pressed', hidden ? 'false' : 'true');
       applyZoom();
     });
+    document.querySelectorAll('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { selectTab(b.dataset.tab); }); });
+    const stage = $('stage');
+    stage.addEventListener('wheel', function (e) {
+      if (!(e.ctrlKey || e.metaKey) || !state.scheme) return;
+      e.preventDefault();
+      setZoom(state.zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY);
+    }, { passive: false });
+    let drag = null; // увеличенную схему двигают мышью или пальцем
+    stage.addEventListener('pointerdown', function (e) {
+      if (!state.scheme || e.button !== 0 || state.zoom <= 1.01) return;
+      drag = { x: e.clientX, y: e.clientY, l: stage.scrollLeft, t: stage.scrollTop };
+      stage.classList.add('panning');
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+    });
+    stage.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      stage.scrollLeft = drag.l - (e.clientX - drag.x);
+      stage.scrollTop = drag.t - (e.clientY - drag.y);
+    });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { stage.addEventListener(ev, function () { drag = null; stage.classList.remove('panning'); }); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && state.sel >= 0 && !document.querySelector('dialog[open]')) select(-1, true); });
     $('zoomIn').addEventListener('click', function () { setZoom(state.zoom * 1.5); });
     $('zoomOut').addEventListener('click', function () { setZoom(state.zoom / 1.5); });
     $('zoomFit').addEventListener('click', function () { state.zoom = 1; applyZoom(); });

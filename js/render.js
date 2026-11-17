@@ -265,7 +265,7 @@
   function printed(colors) {
     return colors.map(function (c) {
       if (!c.print) return c;
-      return { code: c.code, symbol: c.symbol, count: c.count, r: c.print.r, g: c.print.g, b: c.print.b, hex: c.print.hex, dark: c.print.dark };
+      return { code: c.code, symbol: c.symbol, count: c.count, r: c.print.r, g: c.print.g, b: c.print.b, hex: c.print.hex, dark: c.print.dark, symImage: c.symImage };
     });
   }
 
@@ -715,12 +715,17 @@
             x.fillText(('0' + (from + rIdx)).slice(-2), cx + w / 2, y + rowH / 2 + 2);
           } else if (col === 1) {
             const sq = rowH * 0.74;
-            x.fillStyle = c.hex;
-            x.fillRect(cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
-            x.lineWidth = 2;
-            x.strokeRect(cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
-            x.lineWidth = 3;
-            drawSymbol(x, c, cx + w / 2, y + rowH / 2, sq * 0.78);
+            if (c.symImage) { // квадратик из схемы программы — точно как на макете
+              x.imageSmoothingEnabled = true;
+              x.drawImage(c.symImage, cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
+            } else {
+              x.fillStyle = c.hex;
+              x.fillRect(cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
+              x.lineWidth = 2;
+              x.strokeRect(cx + (w - sq) / 2, y + (rowH - sq) / 2, sq, sq);
+              x.lineWidth = 3;
+              drawSymbol(x, c, cx + w / 2, y + rowH / 2, sq * 0.78);
+            }
           } else if (col === 2) {
             x.fillStyle = c.hex;
             x.fillRect(cx + w * 0.1, y + rowH * 0.15, w * 0.8, rowH * 0.7);
@@ -802,12 +807,18 @@
         if (!c) break;
         const cy = 830 + row * 117;
         const sq = 63 * k, sx = x0 + 219 * k;
-        x.fillStyle = c.hex;
-        x.fillRect(sx, cy - sq / 2, sq, sq);
-        x.strokeStyle = '#444444';
-        x.lineWidth = 2;
-        x.strokeRect(sx + 1, cy - sq / 2 + 1, sq - 2, sq - 2);
-        drawSymbol(x, c, sx + sq / 2, cy, sq * 0.76);
+        if (c.symImage) { // квадратик из схемы программы — точно как на макете
+          x.imageSmoothingEnabled = true;
+          x.imageSmoothingQuality = 'high';
+          x.drawImage(c.symImage, sx, cy - sq / 2, sq, sq);
+        } else {
+          x.fillStyle = c.hex;
+          x.fillRect(sx, cy - sq / 2, sq, sq);
+          x.strokeStyle = '#444444';
+          x.lineWidth = 2;
+          x.strokeRect(sx + 1, cy - sq / 2 + 1, sq - 2, sq - 2);
+          drawSymbol(x, c, sx + sq / 2, cy, sq * 0.76);
+        }
         const rw = 221 * k, rh = 91 * k, rx = x0 + 374 * k;
         x.fillStyle = c.hex;
         x.fillRect(rx, cy - rh / 2, rw, rh);

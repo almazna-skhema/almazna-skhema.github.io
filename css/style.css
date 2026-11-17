@@ -90,6 +90,13 @@ body.hide-panel .panel { display: none; }
 .sections.three a { font-size: 12px; padding: 7px 4px; }
 .sections.four { display: grid; grid-template-columns: 1fr 1fr; }
 .sections.four a { font-size: 12px; padding: 6px 4px; }
+.kit-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
+.kit-rows li { display: grid; grid-template-columns: auto 1fr 64px; gap: 8px; align-items: center; }
+.kit-rows .row-thumb img { display: block; height: 30px; }
+.kit-rows input { width: 100%; min-width: 0; padding: 6px 8px; }
+.kit-rows input.sym { text-align: center; font-size: 16px; }
+.kit-rows input.unsure, .kit-rows .sym.unsure { background: #fff4c2; color: #222; border-color: #e0b400; }
+.kit-rows .sym.fixed { text-align: center; font-size: 18px; font-weight: 600; color: var(--accent); }
 .stepper.four { grid-template-columns: repeat(4, 1fr); }
 /* готовые макеты: список значков и подсветка */
 .sym-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto; }

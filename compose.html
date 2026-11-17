@@ -8,7 +8,7 @@
   <meta name="referrer" content="no-referrer">
   <title>Макет из схемы</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234a67d6'/%3E%3Cpath d='M16 6l9 10-9 10-9-10z' fill='%23fff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=28">
+  <link rel="stylesheet" href="css/style.css?v=29">
 </head>
 <body class="compose">
   <svg class="sprite" aria-hidden="true">
@@ -65,6 +65,16 @@
         <button type="button" class="link" id="resetAll" hidden>Вернуть все значки как было</button>
       </section>
 
+      <section class="step" id="kitStep" hidden>
+        <h2>Вкладыш и этикетки</h2>
+        <p class="lead">Номера цветов и значки сервис прочитал из легенды программы — для вкладыша в набор и этикеток на пакетики. Сверьте с картинкой слева: что прочитано неуверенно, выделено жёлтым. Новые значки берутся из замены выше.</p>
+        <ul class="kit-rows" id="kitRows"></ul>
+        <div class="row tight">
+          <button type="button" id="insertSave" disabled><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>Вкладыш PNG</span></button>
+          <button type="button" id="labelsSave" disabled><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span>Этикетки Word</span></button>
+        </div>
+      </section>
+
       <section class="step" id="metaStep" hidden>
         <h2>Подписи на макете</h2>
         <p class="lead">Артикул и название встанут в шапку, артикул — ещё и в имя файла. Сайты, QR-коды и логотип общие с разделом «Алмазная схема»: поменяете здесь — поменяются и там.</p>
@@ -99,6 +109,11 @@
   <main>
     <nav class="toolbar">
       <button type="button" class="icon" id="panelToggle" aria-pressed="true" title="Скрыть или показать настройки" aria-label="Скрыть или показать настройки"><svg class="ic" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+      <div class="tablist" role="tablist" aria-label="Что показать">
+        <button role="tab" data-tab="sheet" aria-selected="true" title="Лист для типографии целиком">Лист</button>
+        <button role="tab" data-tab="scheme" aria-selected="false" title="Схема в полном размере: увеличьте и проверьте новые значки">Схема</button>
+        <button role="tab" data-tab="insert" aria-selected="false" title="Лист A4 в набор: значки и номера цветов">Вкладыш</button>
+      </div>
       <div class="tools">
         <button type="button" class="icon" id="zoomOut" title="Уменьшить" aria-label="Уменьшить"><svg class="ic" aria-hidden="true"><use href="#i-minus"></use></svg></button>
         <button type="button" class="zoom-label" id="zoomFit" title="Вписать в окно"><span id="zoomLabel">100%</span></button>
@@ -139,14 +154,16 @@
 
   <div class="tip" id="tip" role="tooltip" hidden></div>
 
-  <script src="js/i18n.js?v=28"></script>
-  <script src="js/engine.js?v=28"></script>
-  <script src="js/files.js?v=28"></script>
-  <script src="js/render.js?v=28"></script>
-  <script src="js/png-edit.js?v=28"></script>
-  <script src="js/layout-scan.js?v=28"></script>
-  <script src="js/scheme-import.js?v=28"></script>
-  <script src="js/symbol-picker.js?v=28"></script>
-  <script src="js/compose-app.js?v=28"></script>
+  <script src="js/i18n.js?v=29"></script>
+  <script src="js/palette-dmc.js?v=29"></script>
+  <script src="js/engine.js?v=29"></script>
+  <script src="js/files.js?v=29"></script>
+  <script src="js/render.js?v=29"></script>
+  <script src="js/png-edit.js?v=29"></script>
+  <script src="js/layout-scan.js?v=29"></script>
+  <script src="js/scheme-import.js?v=29"></script>
+  <script src="js/scheme-ocr.js?v=29"></script>
+  <script src="js/symbol-picker.js?v=29"></script>
+  <script src="js/compose-app.js?v=29"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* Выбор нового значка для позначки — общий для разделов «Готовые макеты» и «Макет из схемы».
  * Окно #symDialog (#symThumb, #symSub, #symWarn, #symList, #symKeep, #symDone, #symClose) одинаковое
- * на обеих страницах. Раздел передаёт ctx(): { scan, edits, crops, size } и onApply(k, symbol | null). */
+ * на обеих страницах. Раздел передаёт ctx(): { scan, edits, crops, size, used? } и onApply(k, symbol | null). */
 (function (A) {
   'use strict';
 
@@ -42,9 +42,11 @@
   }
 
   function fill() {
-    const list = $('symList'), edits = ctx().edits, taken = new Map();
+    const c0 = ctx(), list = $('symList'), edits = c0.edits, taken = new Map();
     list.textContent = '';
     edits.forEach(function (s, k) { if (k !== pickFor) taken.set(s, k); });
+    // значки, которые уже стоят в схеме у других цветов (если раздел их знает): used — Map значок → позначка
+    if (c0.used) c0.used.forEach(function (k, s) { if (k !== pickFor && !edits.has(k)) taken.set(s, k); });
     A.SHAPES.concat(A.MORE_SHAPES, A.SYMBOLS, A.MORE_LETTERS, A.MORE_GLYPHS).forEach(function (sym) {
       const b = el('button', 'sym-item' + (sym === pickSym ? ' current' : '') + (taken.has(sym) ? ' used' : ''), sym);
       b.type = 'button';
