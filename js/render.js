@@ -467,14 +467,15 @@
       x.imageSmoothingEnabled = true;
       x.imageSmoothingQuality = 'high';
       x.drawImage(mid, 0, 0, W, H);
-      x.fillStyle = 'rgba(12,20,40,0.16)';
+      // meta.light — светлое оформление, как у макетов типографии из программы: фон светлее, тёмная рамка и надписи
+      x.fillStyle = meta.light ? 'rgba(255,255,255,0.2)' : 'rgba(12,20,40,0.16)';
       x.fillRect(0, 0, W, H);
     }
 
-    // схема и тонкая белая рамка вокруг
+    // схема и рамка вокруг: тонкая белая или (светлое оформление) тёмная
     x.drawImage(scheme, M, M, sw, sh);
-    x.strokeStyle = '#ffffff';
-    x.lineWidth = Math.max(1, mm(0.35));
+    x.strokeStyle = meta.light ? '#1c1c1c' : '#ffffff';
+    x.lineWidth = Math.max(1, mm(meta.light ? 0.7 : 0.35));
     const fo = mm(1.2);
     x.strokeRect(M - fo, M - fo, sw + fo * 2, sh + fo * 2);
 
@@ -504,7 +505,8 @@
     const cy = mm(14);
     let bx = (W - totalW * k) / 2;
     x.save();
-    x.shadowColor = 'rgba(0,0,0,0.65)';
+    const shadow = meta.light ? 'transparent' : 'rgba(0,0,0,0.65)';
+    x.shadowColor = shadow;
     x.shadowBlur = mm(1.4);
     blocks.forEach(function (b) {
       if (b.type === 'thumb') {
@@ -516,11 +518,11 @@
         x.strokeStyle = '#ffffff';
         x.lineWidth = Math.max(1, mm(0.3));
         x.strokeRect(bx, cy - th / 2, tw, th);
-        x.shadowColor = 'rgba(0,0,0,0.65)';
+        x.shadowColor = shadow;
       } else {
         const size = b.size * k, lh = size * 1.3;
         x.font = boldFont(size);
-        x.fillStyle = '#ffffff';
+        x.fillStyle = meta.light ? '#111111' : '#ffffff';
         x.textAlign = 'left';
         x.textBaseline = 'middle';
         const y0 = cy - ((b.lines.length - 1) * lh) / 2;
@@ -530,13 +532,17 @@
     });
     x.restore();
 
-    // легенда DMC у правого края
-    const n = res.colors.length;
+    // легенда DMC у правого края. meta.legendImages — готовые строки из чужой схемы картинками
+    // ({ sq: квадратик со значком, code: номер }), тогда рисуем их, а не свои значки
+    const imgs = meta.legendImages || null;
+    const n = imgs ? imgs.length : res.colors.length;
     const rowH = Math.min(mm(7.5), (H - mm(40)) / (n + 2));
     const codeFont = Math.max(5, Math.round(rowH * 0.5)) + 'px ' + FONT;
     x.font = codeFont;
     let codeW = 0;
-    res.colors.forEach(function (c) { codeW = Math.max(codeW, x.measureText(c.code).width); });
+    const codeH = rowH * 0.36; // высота цифр номера — как у шрифта codeFont
+    if (imgs) imgs.forEach(function (r) { codeW = Math.max(codeW, (r.code.width * codeH) / r.code.height); });
+    else res.colors.forEach(function (c) { codeW = Math.max(codeW, x.measureText(c.code).width); });
     // ширина плашки — по самому длинному номеру, но не шире поля листа
     const boxW = Math.min(M - mm(4), Math.max(rowH * 2.9, rowH * 1.27 + codeW + rowH * 0.45));
     const codeMax = boxW - rowH * 1.27 - rowH * 0.25;
@@ -551,7 +557,17 @@
     x.font = boldFont(rowH * 0.56);
     x.fillText('DMC', lx + rowH * 0.35, ly + rowH * 0.75);
     const sq = rowH * 0.62;
-    printed(res.colors).forEach(function (c, i) {
+    if (imgs) {
+      x.imageSmoothingEnabled = true;
+      x.imageSmoothingQuality = 'high';
+      imgs.forEach(function (r, i) {
+        const y = ly + rowH * (1.35 + i);
+        const qx = lx + rowH * 0.35, qy = y + (rowH - sq) / 2;
+        x.drawImage(r.sq, qx, qy, sq, sq);
+        const cw = Math.min(codeMax, (r.code.width * codeH) / r.code.height), ch = (cw * r.code.height) / r.code.width;
+        x.drawImage(r.code, qx + sq + rowH * 0.3, y + (rowH - ch) / 2, cw, ch);
+      });
+    } else printed(res.colors).forEach(function (c, i) {
       const y = ly + rowH * (1.35 + i);
       const qx = lx + rowH * 0.35, qy = y + (rowH - sq) / 2;
       x.fillStyle = c.hex;

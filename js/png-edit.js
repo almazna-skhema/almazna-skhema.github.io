@@ -39,9 +39,18 @@
     try {
       bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
     } catch (e) { throw fail('broken'); }
+    try {
+      const dec = await fromBitmap(bmp, opt);
+      dec.bits = bytes[24];
+      return dec;
+    } finally { bmp.close(); }
+  }
+
+  /* Любая картинка, уже открытая браузером, → плоскости R, G, B (картинку не закрывает). */
+  async function fromBitmap(bmp, opt) {
     const W = bmp.width, H = bmp.height;
     const cv = A.makeCanvas(W, Math.min(BAND, H)), x = cv.getContext('2d', { willReadFrequently: true });
-    if (!x) { bmp.close(); throw fail('big'); }
+    if (!x) throw fail('big');
     const comps = [0, 1, 2].map(function (i) {
       return { id: i + 1, h: 1, v: 1, w: W, hgt: H, pw: W, plane: new Uint8Array(W * H) };
     });
@@ -58,12 +67,11 @@
       }
       if (opt && opt.onStep) await opt.onStep();
     }
-    bmp.close();
     cv.width = cv.height = 0;
     return {
       frame: { width: W, height: H, comps: comps, hmax: 1, vmax: 1 },
       adobe: { transform: 0 }, // для общего кода: составляющие уже RGB, пересчитывать не нужно
-      png: true, alpha: alpha, bits: bytes[24]
+      png: true, alpha: alpha
     };
   }
 
@@ -100,5 +108,5 @@
     return Math.round(u32(bytes, k.start + 8) * 0.0254);
   }
 
-  A.pngEdit = { isPng: isPng, decode: decode, encode: encode, chunks: chunks, dpiOf: dpiOf };
+  A.pngEdit = { isPng: isPng, decode: decode, fromBitmap: fromBitmap, encode: encode, chunks: chunks, dpiOf: dpiOf };
 })(typeof window !== 'undefined' ? (window.ALMAZ = window.ALMAZ || {}) : module.exports);

@@ -4,7 +4,7 @@
   'use strict';
 
   const T = A.T, J = A.jpegEdit, P = A.pngEdit, S = A.layoutScan;
-  const VERSION = T('версия') + ' 27 · 17.11.2026';
+  const VERSION = T('версия') + ' 28 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   // больше браузер не удержит вместе со всеми расчётами; на телефоне и планшете памяти меньше
   const PHONE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -71,19 +71,7 @@
   }
 
   // ---------- рисунок значка ----------
-  /* Покрытие значком области w×h (0…1): рисуем в 4 раза крупнее и усредняем — края получаются мягкими. */
-  function maskFor(w, h, sym, frac) {
-    const Q = 4, W4 = w * Q, H4 = h * Q, cv = A.makeCanvas(W4, H4), x = cv.getContext('2d', { willReadFrequently: true });
-    A.drawSymbol(x, { symbol: sym, dark: false }, W4 / 2, H4 / 2, frac * Math.max(W4, H4));
-    const a = x.getImageData(0, 0, W4, H4).data, m = new Float32Array(w * h);
-    for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
-      let s = 0;
-      for (let dy = 0; dy < Q; dy++) for (let dx = 0; dx < Q; dx++) s += a[((y * Q + dy) * W4 + xx * Q + dx) * 4 + 3];
-      m[y * w + xx] = s / (Q * Q * 255);
-    }
-    cv.width = cv.height = 0;
-    return m;
-  }
+  const maskFor = A.symbolPicker.maskFor; // рисунок значка — общий с разделом «Макет из схемы»
 
   /* Нарисовать новые значки на картинке для экрана (те же правила, что и в файле). */
   function repaintPreview() {
@@ -194,7 +182,7 @@
       row.appendChild(info);
       const sym = state.edits.get(k), target = el('span', 'row-target' + (sym ? ' set' : ''), sym ? '→ ' + sym.replace(/︎/g, '') : '→ …');
       row.appendChild(target);
-      row.addEventListener('click', function () { select(k); openPicker(k); });
+      row.addEventListener('click', function () { select(k); A.symbolPicker.open(k); });
       li.appendChild(row);
       if (sym) {
         const x = el('button', 'color-x');
@@ -227,71 +215,6 @@
     setStatus(n ? T('Заменено значков: ') + n + T('. Сохраните файл, когда всё готово.') : T('Выберите значок слева, чтобы заменить его.'));
   }
 
-  // ---------- выбор нового значка ----------
-  let pickFor = -1, pickSym = null;
-  function similarTo(sym, except) {
-    // похожий значок уже есть в макете: сравниваем форму с образцами клеток
-    const sc = state.scan, grid = sc.grid, n = 10, w = Math.round(grid.pitch * 0.8), m = maskFor(w, w, sym, (grid.pitch * (+$('size').value / 100)) / w);
-    const small = new Float32Array(n * n), cnt = new Float32Array(n * n);
-    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) { const i = Math.floor((y * n) / w) * n + Math.floor((x * n) / w); small[i] += m[y * w + x]; cnt[i]++; }
-    for (let i = 0; i < n * n; i++) small[i] /= cnt[i];
-    let best = -1, bd = Infinity;
-    sc.classes.forEach(function (c, k) {
-      if (k === except || state.edits.has(k)) return;
-      let s = 0;
-      for (let i = 0; i < n * n; i++) { const q = small[i] - c.mask[i]; s += q * q; }
-      if (s < bd) { bd = s; best = k; }
-    });
-    return bd < 1.6 ? best : -1;
-  }
-
-  function fillPicker() {
-    const list = $('symList');
-    list.textContent = '';
-    const taken = new Map();
-    state.edits.forEach(function (s, k) { if (k !== pickFor) taken.set(s, k); });
-    A.SHAPES.concat(A.MORE_SHAPES, A.SYMBOLS, A.MORE_LETTERS, A.MORE_GLYPHS).forEach(function (sym) {
-      const b = el('button', 'sym-item' + (sym === pickSym ? ' current' : '') + (taken.has(sym) ? ' used' : ''), sym);
-      b.type = 'button';
-      b.disabled = taken.has(sym);
-      b.title = taken.has(sym) ? T('Уже выбран для другого значка') : T('Поставить этот значок');
-      b.addEventListener('click', function () { pickSym = sym; fillPicker(); warn(); });
-      list.appendChild(b);
-    });
-  }
-
-  function warn() {
-    const w = $('symWarn');
-    const k = pickSym ? similarTo(pickSym, pickFor) : -1;
-    w.hidden = k < 0;
-    if (k < 0) return;
-    w.textContent = T('Похожий значок уже есть в макете — клетки будет легко перепутать при выкладке. Он показан ниже.');
-    w.appendChild(state.crops[k].cloneNode());
-  }
-
-  function openPicker(k) {
-    pickFor = k;
-    pickSym = state.edits.get(k) || null;
-    const c = state.scan.classes[k], th = $('symThumb');
-    th.textContent = '';
-    th.appendChild(state.crops[k].cloneNode());
-    $('symSub').textContent = fmt(c.count) + ' ' + T('клеток получат новый значок') + (c.legend >= 0 ? '' : ' · ' + T('этого значка нет в легенде'));
-    fillPicker();
-    warn();
-    const d = $('symDialog');
-    if (d.showModal) d.showModal(); else d.setAttribute('open', '');
-  }
-
-  function closePicker(apply) {
-    const d = $('symDialog');
-    if (apply && pickFor >= 0) {
-      if (pickSym) state.edits.set(pickFor, pickSym); else state.edits.delete(pickFor);
-      afterEdit();
-    }
-    if (d.close) d.close(); else d.removeAttribute('open');
-    pickFor = -1;
-  }
-
   // ---------- загрузка ----------
   async function load(file) {
     if (!file) return;
@@ -311,7 +234,11 @@
       const g = S.grayPlane(dec), grid = S.findGrid(g, f.width, f.height);
       // клетка меньше 8 точек или сетка не нашлась — это не макет для печати (фото, картинка)
       if (grid.cols < 4 || grid.rows < 4 || !(grid.pitch >= 8)) throw Object.assign(new Error('grid'), { code: 'grid' });
-      const legend = S.findLegend(g, f.width, f.height, grid);
+      let legend = S.findLegend(g, f.width, f.height, grid);
+      if (!legend && A.schemeImport) { // схема прямо из программы: легенда строками справа, без белой плашки
+        const rows = A.schemeImport.findLegend(g, f.width, f.height, grid);
+        if (rows.length >= 2) legend = { box: null, rows: rows.map(function (r) { return { x0: r.sq.x0, y0: r.sq.y0, x1: r.sq.x1, y1: r.sq.y1, rowX1: r.code.x1 }; }) };
+      }
       setStatus(T('Раскладываю клетки по значкам…'));
       await wait(20);
       const cl = await S.classify(dec, g, f.width, grid, legend, function () { return wait(0); });
@@ -526,11 +453,8 @@
     $('inLegend').addEventListener('change', queueRepaint);
     $('resetAll').addEventListener('click', function () { state.edits.clear(); afterEdit(); });
     $('save').addEventListener('click', save);
-    $('symClose').addEventListener('click', function () { closePicker(false); });
-    $('symDone').addEventListener('click', function () { closePicker(true); });
-    $('symKeep').addEventListener('click', function () { pickSym = null; closePicker(true); });
-    $('symDialog').addEventListener('click', function (e) { if (e.target === e.currentTarget) closePicker(false); });
-    $('symDialog').addEventListener('close', function () { pickFor = -1; });
+    A.symbolPicker.init(function () { return { scan: state.scan, edits: state.edits, crops: state.crops, size: +$('size').value / 100 }; },
+      function (k, sym) { if (sym) state.edits.set(k, sym); else state.edits.delete(k); afterEdit(); });
     $('panelToggle').addEventListener('click', function () {
       const hidden = document.body.classList.toggle('hide-panel');
       $('panelToggle').setAttribute('aria-pressed', hidden ? 'false' : 'true');

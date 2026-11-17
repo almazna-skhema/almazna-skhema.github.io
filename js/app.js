@@ -4,8 +4,8 @@
 
   const T = A.T; // перевод надписи на выбранный язык
 
-  const ASSET_VERSION = 27; // тот же номер, что в адресах скриптов в index.html
-  const VERSION = T('версия') + ' 27 · 17.11.2026';
+  const ASSET_VERSION = 28; // тот же номер, что в адресах скриптов в index.html
+  const VERSION = T('версия') + ' 28 · 17.11.2026';
   const $ = function (id) { return document.getElementById(id); };
   const defaultPal = A.parsePalette(A.DMC_RAW);
   let pal = defaultPal;      // действующая таблица цветов
